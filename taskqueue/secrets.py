@@ -16,7 +16,6 @@ CLOUD_VOLUME_DIR = mkdir(os.path.join(os.environ['HOME'], '.cloudvolume/'))
 
 secret_path = mkdir(os.path.join(CLOUD_VOLUME_DIR, 'secrets/'))
 
-PROJECT_NAME = None
 project_name_path = os.path.join(CLOUD_VOLUME_DIR, 'project_name')
 if os.path.exists(project_name_path):
   with open(project_name_path, 'r') as f:
