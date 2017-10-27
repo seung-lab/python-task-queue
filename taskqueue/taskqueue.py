@@ -281,7 +281,7 @@ class TaskQueue(ThreadedQueue):
         return self
 
 class MockTaskQueue():
-    def __init__(self, queue_name=''):
+    def __init__(self, queue_name='', queue_server=''):
         pass
 
     def insert(self, task):
