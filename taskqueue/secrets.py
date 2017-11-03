@@ -35,7 +35,7 @@ def secretpath(filepath):
 project_name_path = secretpath('project_name')
 if os.path.exists(project_name_path):
   with open(project_name_path, 'r') as f:
-    PROJECT_NAME = f.read()
+    PROJECT_NAME = f.read().strip()
 
 google_credentials_path = secretpath('secrets/google-secret.json')
 if os.path.exists(google_credentials_path):
