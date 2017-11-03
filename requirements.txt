@@ -1,6 +1,6 @@
-cloud-volume==0.5.1
+cloud-volume==0.5.8
 google-api-python-client==1.6.2
-google-cloud==0.26.1
+google-cloud==0.27
 numpy==1.13.3
 pytest==3.2.3
 pbr
