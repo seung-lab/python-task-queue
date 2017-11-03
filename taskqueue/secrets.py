@@ -34,10 +34,20 @@ def secretpath(filepath):
 
   return preferred
 
-project_name_path = secretpath('project_name')
-if os.path.exists(project_name_path):
-  with open(project_name_path, 'r') as f:
-    PROJECT_NAME = f.read().strip()
+PROJECT_NAME = None 
+project_name_paths = [ 
+  secretpath('secrets/project_name'),
+  secretpath('project_name')
+]
+
+if 'GOOGLE_PROJECT_NAME' in os.environ: 
+  PROJECT_NAME = os.environ['GOOGLE_PROJECT_NAME']
+else: 
+  for path in project_name_paths:
+    if os.path.exists(path):
+      with open(path, 'r') as f:
+        PROJECT_NAME = f.read().strip()
+      break
 
 google_credentials_path = secretpath('secrets/google-secret.json')
 if os.path.exists(google_credentials_path):
@@ -45,4 +55,5 @@ if os.path.exists(google_credentials_path):
     .from_service_account_file(google_credentials_path)
 else:
   google_credentials = ''
+
 
