@@ -4,7 +4,7 @@ import os
 import json
 
 from google.oauth2 import service_account
-from cloudvolume.lib import mkdir
+from cloudvolume.lib import mkdir, colorize
 
 QUEUE_NAME = '' if 'PIPELINE_USER_QUEUE' not in os.environ else os.environ['PIPELINE_USER_QUEUE']
 TEST_QUEUE_NAME = '' if 'TEST_PIPELINE_USER_QUEUE' not in os.environ else os.environ['TEST_PIPELINE_USER_QUEUE']
@@ -15,22 +15,24 @@ APPENGINE_QUEUE_URL = 'https://queue-dot-neuromancer-seung-import.appspot.com'
 CLOUD_VOLUME_DIR = mkdir(os.path.join(os.environ['HOME'], '.cloudvolume'))
 
 def secretpath(filepath):
-  preferred = CLOUD_VOLUME_DIR
+  preferred = os.path.join(CLOUD_VOLUME_DIR, filepath)
   
   if os.path.exists(preferred):
-    return os.path.join(preferred, filepath)
+    return preferred
 
   backcompat = [
     os.path.join(os.environ['HOME'], '.neuroglancer'), # older
     '/' # original
   ]
 
-  for path in rootpaths:
-    if os.path.exists(path):
-      print(colorize('yellow', 'Deprecation Warning: Directory ~/.cloudvolume is now preferred to ~/.neuroglancer.\nConsider running: mv ~/.neuroglancer ~/.cloudvolume'))  
-      return mkdir(os.path.join(path, filepath))
+  backcompat = [ os.path.join(path, filepath) for path in backcompat ] 
 
-  return mkdir(os.path.join(preferred, filepath))
+  for path in backcompat:
+    if os.path.exists(path):
+      print(colorize('yellow', 'Deprecation Warning: {} is now preferred to {}.'.format(preferred, path)))  
+      return path
+
+  return preferred
 
 project_name_path = secretpath('project_name')
 if os.path.exists(project_name_path):
