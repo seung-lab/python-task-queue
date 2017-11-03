@@ -288,7 +288,7 @@ class MockTaskQueue():
         task.execute()
         del task
 
-    def wait(self):
+    def wait(self, progress=None):
       return self
 
     def kill_threads(self):
