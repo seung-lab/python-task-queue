@@ -12,9 +12,11 @@ import googleapiclient.errors
 import googleapiclient.discovery
 import numpy as np
 
+from future.utils import with_metaclass
+
 from cloudvolume.threaded_queue import ThreadedQueue
 from .secrets import google_credentials, PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE
-from appengine_queue_api import AppEngineTaskQueue
+from .appengine_queue_api import AppEngineTaskQueue
 
 __all__ = [ 'RegisteredTask', 'TaskQueue' ]
 
@@ -41,9 +43,7 @@ class Meta(type):
         cls._arg_names = inspect.getargspec(class_dict['__init__'])[0][1:]
         return cls
 
-class RegisteredTask(object):
-    __metaclass__ = Meta
-
+class RegisteredTask(with_metaclass(Meta)):
     def __init__(self, *arg_values):
         self._args = OrderedDict(zip(self._arg_names, arg_values))
 
@@ -66,7 +66,7 @@ class RegisteredTask(object):
 
     @property
     def payloadBase64(self):
-        return base64.b64encode(self.serialize())
+        return base64.b64encode(self.serialize().encode('utf8'))
 
     @property
     def id(self):
@@ -160,7 +160,7 @@ class TaskQueue(ThreadedQueue):
         Insert a task into an existing queue.
         """
         body = {
-            "payloadBase64": task.payloadBase64,
+            "payloadBase64": task.payloadBase64.decode('utf8'),
             "queueName": self._queue_name,
             "groupByTag": True,
             "tag": task.__class__.__name__
