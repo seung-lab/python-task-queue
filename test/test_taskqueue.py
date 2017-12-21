@@ -1,5 +1,6 @@
 import os
 
+from builtins import range
 import pytest
 
 from taskqueue import RegisteredTask, TaskQueue
@@ -24,13 +25,9 @@ def test_get():
   global QUEUE_NAME
   tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server='pull-queue')
 
-
-  # import pdb
-  # pdb.set_trace()
-
   n_inserts = 5
   tq.purge()
-  for _ in xrange(n_inserts):
+  for _ in range(n_inserts):
     task = MockTask()
     tq.insert(task)
   tq.wait()
@@ -41,7 +38,7 @@ def test_single_threaded_insertion():
   tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server='pull-queue').purge()
   
   n_inserts = 5
-  for _ in xrange(n_inserts):
+  for _ in range(n_inserts):
     task = MockTask()
     tq.insert(task)
 
@@ -67,7 +64,7 @@ def test_multi_threaded_insertion():
   tq.wait()
   assert tq.enqueued == 0
   
-  for _ in xrange(n_inserts):
+  for _ in range(n_inserts):
     task = MockTask()
     tq.insert(task)
   tq.wait()
