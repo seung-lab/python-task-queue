@@ -1,6 +1,6 @@
-cloud-volume==0.6.4
+cloud-volume>=0.6.6
 google-api-python-client==1.6.2
-google-cloud==0.32
+google-cloud>=0.32
 google-auth-httplib2==0.0.2
 numpy==1.13.3
 pytest==3.3.1
