@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import six
+
 import json
 import inspect
 import base64
@@ -75,7 +77,7 @@ class RegisteredTask(with_metaclass(Meta)):
     def __repr__(self):
         
         string = self.__class__.__name__ + "("
-        for arg_name, arg_value in self._args.iteritems():
+        for arg_name, arg_value in six.iteritems(self._args):
             if type(arg_value) is str or type(arg_value) is unicode:
                 string += "{}='{}',".format(arg_name, arg_value)
             else:

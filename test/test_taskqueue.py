@@ -23,66 +23,69 @@ class MockTask(RegisteredTask):
 
 def test_get():
   global QUEUE_NAME
-  tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server='pull-queue')
 
-  n_inserts = 5
-  tq.purge()
-  for _ in range(n_inserts):
-    task = MockTask()
-    tq.insert(task)
-  tq.wait()
-  tq.purge()
+  for qtype in ('pull-queue', 'appengine'):
+    print(qtype)
+    tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype)
+
+    n_inserts = 5
+    tq.purge()
+    for _ in range(n_inserts):
+      task = MockTask()
+      tq.insert(task)
+    tq.wait()
+    tq.purge()
 
 def test_single_threaded_insertion():
   global QUEUE_NAME
-  tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server='pull-queue').purge()
-  
-  n_inserts = 5
-  for _ in range(n_inserts):
-    task = MockTask()
-    tq.insert(task)
 
-  lst = tq.list()
-  assert 'items' in lst
-  items = lst['items']
-  assert len(items) == n_inserts
+  for qtype in ('pull-queue', 'appengine'):
+    tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype).purge()
+    
+    n_inserts = 5
+    for _ in range(n_inserts):
+      task = MockTask()
+      tq.insert(task)
 
-  tags = map(lambda x: x['tag'], items)
-  assert all(map(lambda x: x == MockTask.__name__, tags))
+    lst = tq.list()
+    assert 'items' in lst
+    items = lst['items']
+    assert len(items) == n_inserts
 
-  tq.purge()
-  assert not 'items' in tq.list()
-  assert tq.enqueued == 0
+    tags = map(lambda x: x['tag'], items)
+    assert all(map(lambda x: x == MockTask.__name__, tags))
+
+    tq.purge()
+    assert not 'items' in tq.list()
+    assert tq.enqueued == 0
 
 
 def test_multi_threaded_insertion():
   global QUEUE_NAME
-  tq = TaskQueue(n_threads=40, queue_name=QUEUE_NAME, queue_server='pull-queue')
+  for qtype in ('pull-queue', 'appengine'):
+    tq = TaskQueue(n_threads=40, queue_name=QUEUE_NAME, queue_server=qtype)
 
-  n_inserts = 100
-  tq.purge()
-  tq.wait()
-  assert tq.enqueued == 0
-  
-  for _ in range(n_inserts):
-    task = MockTask()
-    tq.insert(task)
-  tq.wait()
+    n_inserts = 100
+    tq.purge()
+    tq.wait()
+    assert tq.enqueued == 0
+    
+    for _ in range(n_inserts):
+      task = MockTask()
+      tq.insert(task)
+    tq.wait()
 
-  lst = tq.list()
-  assert 'items' in lst
-  items = lst['items']
-  assert len(items) == 100 # task list api only lists 100 items at a time
-  tags = map(lambda x: x['tag'], items)
-  assert all(map(lambda x: x == MockTask.__name__, tags))
-  tq.purge()
-  assert tq.enqueued == 0
+    lst = tq.list()
+    assert 'items' in lst
+    items = lst['items']
+    assert len(items) == 100 # task list api only lists 100 items at a time
+    tags = map(lambda x: x['tag'], items)
+    assert all(map(lambda x: x == MockTask.__name__, tags))
+    tq.purge()
+    assert tq.enqueued == 0
 
 def test_400_errors():
   global QUEUE_NAME
   with TaskQueue(n_threads=1, queue_name=QUEUE_NAME) as tq:
     tq.delete('nonexistent')
-
-
-
 

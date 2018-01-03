@@ -1,5 +1,11 @@
 import json
-import urllib
+
+# Python2/3 compat
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode
+
 
 from httplib2 import Http
 from googleapiclient.http import HttpRequest
@@ -14,7 +20,7 @@ class AppEngineTaskQueue():
 
         def _postprocess(self, response, content):
             if content:
-                content = json.loads(content)
+                content = json.loads(content.decode('utf8'))
 
             if type(content) == list and len(content):
                 # mimicking  Google's Pull Queue API
@@ -59,8 +65,12 @@ class AppEngineTaskQueue():
 
             if groupByTag == False:
                 tag = ''
-            query_str = '?' + urllib.urlencode(
-                {'numTasks':numTasks, 'leaseSecs':leaseSecs, 'tag':tag})
+            
+            query_str = '?' + urlencode({
+                'numTasks': numTasks, 
+                'leaseSecs': leaseSecs, 
+                'tag': tag
+            })
 
             return HttpRequest(
                 self._ae._http,
@@ -84,7 +94,7 @@ class AppEngineTaskQueue():
 
         def _postprocess(self, response, content):
             if content:
-                content = json.loads(content)
+                content = json.loads(content.decode('utf8'))
 
             if type(content) == list and len(content):
                 # mimicking  Google's Pull Queue API
