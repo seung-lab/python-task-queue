@@ -35,7 +35,7 @@ def deserialize(data):
     return target_class(**params)
 
 def payloadBase64Decode(payload):
-    decoded_string = base64.b64decode(payload).encode('ascii')
+    decoded_string = base64.b64decode(payload).decode('utf8')
     return deserialize(decoded_string)
 
 class Meta(type):
