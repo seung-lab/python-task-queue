@@ -63,8 +63,8 @@ class AppEngineTaskQueue():
                 'leaseSecs': leaseSecs, 
                 'tag': tag,
             }
-            url = self._ae._queue_url + '/{}/taskqueue/{}/tasks/lease{}'.format(
-                project, taskqueue, query_str
+            url = self._ae._queue_url + '/{}/taskqueue/{}/tasks/lease'.format(
+                project, taskqueue
             )
             r = requests.post(url, params=params)
             return ExecuteWrapper(r.json())
