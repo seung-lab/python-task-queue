@@ -49,7 +49,7 @@ class AppEngineTaskQueue():
             return ExecuteWrapper(r.json())
 
         def delete(self, project, taskqueue, task):
-            url = self._ae._queue_url + '/{}/taskqueue/{}/tasks/{}'.format(project, taskqueue, task)
+            url = self._ae._queue_url + '/{}/taskqueue/{}/tasks/id/{}'.format(project, taskqueue, task)
             r = requests.delete(url)
             return ExecuteWrapper(None)
 
