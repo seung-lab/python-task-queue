@@ -75,10 +75,9 @@ class RegisteredTask(with_metaclass(Meta)):
         return self._id
 
     def __repr__(self):
-        
         string = self.__class__.__name__ + "("
         for arg_name, arg_value in six.iteritems(self._args):
-            if type(arg_value) is str or type(arg_value) is unicode:
+            if isinstance(arg_value, six.string_types):
                 string += "{}='{}',".format(arg_name, arg_value)
             else:
                 string += "{}={},".format(arg_name, arg_value)
