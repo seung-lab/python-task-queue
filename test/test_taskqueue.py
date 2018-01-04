@@ -17,6 +17,9 @@ elif TRAVIS_BRANCH == 'master':
 else:
   QUEUE_NAME = 'travis-pull-queue-2'
 
+
+QTYPES = ('pull-queue', 'appengine')
+
 class MockTask(RegisteredTask):
   def __init__(self):
     super(MockTask, self).__init__()
@@ -24,7 +27,7 @@ class MockTask(RegisteredTask):
 def test_get():
   global QUEUE_NAME
 
-  for qtype in ('pull-queue', 'appengine'):
+  for qtype in QTYPES:
     print(qtype)
     tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype)
 
@@ -39,7 +42,7 @@ def test_get():
 def test_single_threaded_insertion():
   global QUEUE_NAME
 
-  for qtype in ('pull-queue', 'appengine'):
+  for qtype in QTYPES:
     tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype).purge()
     
     n_inserts = 5
@@ -62,7 +65,7 @@ def test_single_threaded_insertion():
 
 def test_multi_threaded_insertion():
   global QUEUE_NAME
-  for qtype in ('pull-queue', 'appengine'):
+  for qtype in QTYPES:
     tq = TaskQueue(n_threads=40, queue_name=QUEUE_NAME, queue_server=qtype)
 
     n_inserts = 100
@@ -86,6 +89,7 @@ def test_multi_threaded_insertion():
 
 def test_400_errors():
   global QUEUE_NAME
-  with TaskQueue(n_threads=1, queue_name=QUEUE_NAME) as tq:
-    tq.delete('nonexistent')
+  for qtype in QTYPES:
+    with TaskQueue(n_threads=1, queue_name=QUEUE_NAME, queue_server=qtype) as tq:
+      tq.delete('nonexistent')
 

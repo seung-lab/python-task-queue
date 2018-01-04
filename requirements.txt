@@ -6,3 +6,4 @@ numpy==1.13.3
 pytest==3.3.1
 pbr
 tqdm==4.19.5
+requests>2,<3

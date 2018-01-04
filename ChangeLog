@@ -1,0 +1,45 @@
+CHANGES
+=======
+
+0.1.7
+-----
+
+* feat: reviving the appengine taskqueue
+
+0.1.6
+-----
+
+* chore: bumped cloud-volume version
+
+0.1.5
+-----
+
+* feat: python3 compatibility (#3)
+
+0.1.4
+-----
+
+* Wms cloud secrets (#2)
+
+0.1.3
+-----
+
+* fix: secretpath was broken for legacy paths
+
+0.1.2
+-----
+
+* fix: need to strip project\_name in case there's extra whitespace
+* feat: backwards compatible secrets
+* fix: add queue\_server to MockTaskQueue's constructor
+
+0.1.1
+-----
+
+* fix: restore default project\_name
+
+0.1.0
+-----
+
+* feat: Initial commit
+* Initial commit
