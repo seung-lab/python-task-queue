@@ -14,6 +14,7 @@ from cloudvolume.threaded_queue import ThreadedQueue
 
 from .appengine_queue_api import AppEngineTaskQueueAPI
 from .google_queue_api import GoogleTaskQueueAPI
+from .sqs_queue_api import AWSTaskQueueAPI
 from .registered_task import RegisteredTask
 from .secrets import PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE
 
@@ -37,24 +38,26 @@ class TaskQueue(ThreadedQueue):
             super(LookupError, self).__init__('Queue Empty')
 
     def __init__(self, n_threads=40, project=PROJECT_NAME, region=None,
-                 queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE):
+                 queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE, qurl=None):
 
         self._project = project
         self._region = region
         self._queue_name = queue_name
         self._queue_server = queue_server
+        self._qurl = qurl
         self._api = self._initialize_interface()
 
         super(TaskQueue, self).__init__(n_threads) # creates self._queue
 
     # This is key to making sure threading works. Don't refactor this method away.
     def _initialize_interface(self):
-        if self._queue_server == 'appengine':
+        server = self._queue_server.lower()
+        if server == 'appengine':
             return AppEngineTaskQueueAPI(project=self._project, queue_name=self._queue_name)
-        elif self._queue_server in ('pull-queue', 'google'):
+        elif server in ('pull-queue', 'google'):
             return GoogleTaskQueueAPI(project=self._project, queue_name=self._queue_name)
-        # elif self._queue_server == 'sqs':
-        #     return SQSTaskQueue()
+        elif server in ('sqs', 'aws'):
+            return AWSTaskQueueAPI(qurl=self._qurl)
         else:
             raise NotImplementedError('Unknown server ' + self._queue_server)
 
@@ -71,8 +74,7 @@ class TaskQueue(ThreadedQueue):
         
         Returns: (int) number of tasks in cloud queue
         """
-        tqinfo = self._api.status()
-        return tqinfo['stats']['totalTasks']
+        return self._api.enqueued
         
     def _consume_queue_execution(self, fn):
         try:
@@ -169,15 +171,18 @@ class TaskQueue(ThreadedQueue):
 
     def purge(self):
         """Deletes all tasks in the queue."""
-        while True:
-            lst = self.list()
-            if len(lst) == 0:
-                break
+        try:
+            return self._api.purge()
+        except AttributeError:
+            while True:
+                lst = self.list()
+                if len(lst) == 0:
+                    break
 
-            for task in lst:
-                self.delete(task['id'])
-            self.wait()
-        return self
+                for task in lst:
+                    self.delete(task['id'])
+                self.wait()
+            return self
 
     def delete(self, task_id):
         """Deletes a task from a TaskQueue."""

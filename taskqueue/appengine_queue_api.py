@@ -16,6 +16,11 @@ class AppEngineTaskQueueAPI(object):
             QUEUE_ID=self._queue_name,
         )
 
+    @property
+    def enqueued(self):
+        tqinfo = self.status()
+        return int(tqinfo['stats']['totalTasks'])
+
     def status(self):
         return requests.get(self.base_url()).json()
 

@@ -18,7 +18,10 @@ else:
   QUEUE_NAME = 'travis-pull-queue-2'
 
 
-QTYPES = ('appengine',)
+QTYPES = ('aws',)
+
+QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-pull-queue'
+
 
 class MockTask(RegisteredTask):
   def __init__(self):
@@ -28,7 +31,7 @@ def test_get():
   global QUEUE_NAME
 
   for qtype in QTYPES:
-    tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype)
+    tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
 
     n_inserts = 5
     tq.purge()
@@ -42,15 +45,15 @@ def test_single_threaded_insertion():
   global QUEUE_NAME
 
   for qtype in QTYPES:
-    tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype).purge()
+    tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL).purge()
     
     n_inserts = 5
     for _ in range(n_inserts):
       task = MockTask()
       tq.insert(task)
+    tq.wait()
 
-    lst = tq.list()
-    assert len(lst) == n_inserts
+    assert tq.enqueued == n_inserts
 
     tags = map(lambda x: x['tag'], lst)
     assert all(map(lambda x: x == MockTask.__name__, tags))
@@ -61,7 +64,7 @@ def test_single_threaded_insertion():
 def test_multi_threaded_insertion():
   global QUEUE_NAME
   for qtype in QTYPES:
-    tq = TaskQueue(n_threads=40, queue_name=QUEUE_NAME, queue_server=qtype)
+    tq = TaskQueue(n_threads=40, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
 
     n_inserts = 100
     tq.purge()
@@ -83,6 +86,6 @@ def test_multi_threaded_insertion():
 def test_400_errors():
   global QUEUE_NAME
   for qtype in QTYPES:
-    with TaskQueue(n_threads=1, queue_name=QUEUE_NAME, queue_server=qtype) as tq:
+    with TaskQueue(n_threads=1, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL) as tq:
       tq.delete('nonexistent')
 
