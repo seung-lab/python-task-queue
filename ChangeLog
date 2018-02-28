@@ -1,6 +1,19 @@
 CHANGES
 =======
 
+0.2.1
+-----
+
+* fix: python3 compatibility with python2 strings
+
+0.2.0
+-----
+
+* feat: appenging queue api now supports tasks/id/:tid
+* fix: unassigned variable
+* fix: make encoding python3 friendly
+* feat: switched appengine implementation to requests
+
 0.1.7
 -----
 

@@ -18,7 +18,7 @@ else:
   QUEUE_NAME = 'travis-pull-queue-2'
 
 
-QTYPES = ('pull-queue', 'appengine')
+QTYPES = ('appengine',)
 
 class MockTask(RegisteredTask):
   def __init__(self):
@@ -28,7 +28,6 @@ def test_get():
   global QUEUE_NAME
 
   for qtype in QTYPES:
-    print(qtype)
     tq = TaskQueue(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype)
 
     n_inserts = 5
@@ -51,17 +50,13 @@ def test_single_threaded_insertion():
       tq.insert(task)
 
     lst = tq.list()
-    assert 'items' in lst
-    items = lst['items']
-    assert len(items) == n_inserts
+    assert len(lst) == n_inserts
 
-    tags = map(lambda x: x['tag'], items)
+    tags = map(lambda x: x['tag'], lst)
     assert all(map(lambda x: x == MockTask.__name__, tags))
 
     tq.purge()
-    assert not 'items' in tq.list()
     assert tq.enqueued == 0
-
 
 def test_multi_threaded_insertion():
   global QUEUE_NAME
@@ -79,10 +74,8 @@ def test_multi_threaded_insertion():
     tq.wait()
 
     lst = tq.list()
-    assert 'items' in lst
-    items = lst['items']
-    assert len(items) == 100 # task list api only lists 100 items at a time
-    tags = map(lambda x: x['tag'], items)
+    assert len(lst) == 100 # task list api only lists 100 items at a time
+    tags = map(lambda x: x['tag'], lst)
     assert all(map(lambda x: x == MockTask.__name__, tags))
     tq.purge()
     assert tq.enqueued == 0
