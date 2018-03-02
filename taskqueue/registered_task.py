@@ -8,6 +8,8 @@ import re
 from collections import OrderedDict
 from functools import partial
 
+import numpy as np
+
 registry = {}
 
 def register_class(target_class):
