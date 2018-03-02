@@ -12,7 +12,7 @@ class AWSTaskQueueAPI(object):
         matches = re.search(r'sqs.([\w\d-]+).amazonaws', qurl)
 
         if matches is None:
-            raise ValueError(str(qrl) + ' is not a valid SQS url.')
+            raise ValueError(str(qurl) + ' is not a valid SQS url.')
         region_name, = matches.groups()
 
         self._qurl = qurl
