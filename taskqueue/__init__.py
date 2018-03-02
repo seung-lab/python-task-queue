@@ -1,4 +1,4 @@
-from .registered_task import RegisteredTask
+from .registered_task import RegisteredTask, MockTask, PrintTask
 from .taskqueue import TaskQueue, MockTaskQueue
 from .secrets import (
   QUEUE_NAME, TEST_QUEUE_NAME, QUEUE_TYPE, 

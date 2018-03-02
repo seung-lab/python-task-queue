@@ -1,8 +1,5 @@
-from __future__ import print_function
-
-from future.utils import with_metaclass
-
 import six
+from six import with_metaclass
 import inspect
 import json
 import base64
@@ -76,3 +73,15 @@ class RegisteredTask(with_metaclass(Meta)):
             string = string[:-1]
 
         return string + ")"  
+
+class PrintTask(RegisteredTask):
+    def __init__(self):
+        super(PrintTask, self).__init__()
+    def execute(self):
+        print(self)
+
+class MockTask(RegisteredTask):
+    def __init__(self):
+        super(MockTask, self).__init__()
+    def execute(self):
+        pass

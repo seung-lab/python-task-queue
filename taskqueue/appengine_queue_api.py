@@ -47,6 +47,10 @@ class AppEngineTaskQueueAPI(object):
         url = join(self.base_url(), endpoint)
         requests.delete(url)
 
+    def purge(self):
+        url = join(self.base_url(), 'purge')
+        requests.post(url)
+
     def renew_lease(self, task_id, seconds):
         raise NotImplementedError()
         # endpoint = 'tasks/{TASK_ID}:renewLease'.format(TASK_ID=tid)

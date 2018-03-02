@@ -1,23 +1,25 @@
 from __future__ import print_function
 
 import six
-
 import json
 from functools import partial
 
 import googleapiclient.errors
 import numpy as np
 
-from future.utils import with_metaclass
-
 from cloudvolume.threaded_queue import ThreadedQueue
 
 from .appengine_queue_api import AppEngineTaskQueueAPI
 from .google_queue_api import GoogleTaskQueueAPI
-from .sqs_queue_api import AWSTaskQueueAPI
-from .registered_task import RegisteredTask
+from .aws_queue_api import AWSTaskQueueAPI
+from .registered_task import RegisteredTask, payloadBase64Decode
 from .secrets import PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE
 
+def totask(task):
+    print(task)
+    taskobj = payloadBase64Decode(task['payloadBase64'])
+    taskobj._id = task['id']
+    return taskobj
 
 class TaskQueue(ThreadedQueue):
     """
@@ -131,7 +133,7 @@ class TaskQueue(ThreadedQueue):
         Lists all non-deleted Tasks in a TaskQueue, 
         whether or not they are currently leased, up to a maximum of 100.
         """
-        return self._api.list()
+        return [ totask(x) for x in self._api.list() ]
 
     def renew_lease(self, task, seconds):
         """Update the duration of a task lease."""
@@ -140,27 +142,24 @@ class TaskQueue(ThreadedQueue):
     def cancel_lease(self, task):
         return self._api.cancel_lease(task)
 
-    def lease(self, tag=None):
+    def lease(self, num_tasks=1, tag=None):
         """
         Acquires a lease on the topmost N unowned tasks in the specified queue.
         Required query parameters: leaseSecs, numTasks
         """
         tag = tag if tag else None
         tasks = self._api.lease(
-            numTasks=1, 
-            leaseSecs=600,
+            numTasks=num_tasks, 
+            seconds=600,
             groupByTag=(tag is not None),
             tag=tag,
         )
 
-        if not 'items' in tasks:
+        if not len(tasks):
             raise TaskQueue.QueueEmpty
-          
-        task_json = tasks['items'][0]
-        task = payloadBase64Decode(task_json['payloadBase64'])
-        task._id =  task_json['id']
-        
-        return task
+
+        task = tasks[0]
+        return totask(task)
 
     def patch(self):
         """
@@ -180,9 +179,23 @@ class TaskQueue(ThreadedQueue):
                     break
 
                 for task in lst:
-                    self.delete(task['id'])
+                    self.delete(task)
                 self.wait()
             return self
+
+    def acknowledge(self, task_id):
+        if isinstance(task_id, RegisteredTask):
+            task_id = task_id.id
+
+        def cloud_delete(api):
+            api.acknowledge(task_id)
+
+        if len(self._threads):
+            self.put(cloud_delete)
+        else:
+            cloud_delete(self._api)
+
+        return self
 
     def delete(self, task_id):
         """Deletes a task from a TaskQueue."""
