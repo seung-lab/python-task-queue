@@ -12,10 +12,20 @@ from cloudvolume.secrets import (
   boss_credentials, boss_credentials_path
 )
 
-QUEUE_NAME = '' if 'PIPELINE_USER_QUEUE' not in os.environ else os.environ['PIPELINE_USER_QUEUE']
-TEST_QUEUE_NAME = '' if 'TEST_PIPELINE_USER_QUEUE' not in os.environ else os.environ['TEST_PIPELINE_USER_QUEUE']
+QUEUE_NAME = 'pull-queue' if 'PIPELINE_USER_QUEUE' not in os.environ else os.environ['PIPELINE_USER_QUEUE']
+TEST_QUEUE_NAME = 'test-pull-queue' if 'TEST_PIPELINE_USER_QUEUE' not in os.environ else os.environ['TEST_PIPELINE_USER_QUEUE']
 QUEUE_TYPE = 'pull-queue' if 'QUEUE_TYPE' not in os.environ else os.environ['QUEUE_TYPE']
 APPENGINE_QUEUE_URL = 'https://queue-dot-neuromancer-seung-import.appspot.com'
 
 
 
+# google_credentials_path = secretpath('secrets/google-secret.json')
+# if os.path.exists(google_credentials_path):
+#   google_credentials = service_account.Credentials \
+#     .from_service_account_file(google_credentials_path, scopes=[
+#     	'https://www.googleapis.com/auth/appengine.admin', 
+#     	'https://www.googleapis.com/auth/cloud-platform', 
+#     	'https://www.googleapis.com/auth/cloud-tasks'
+#     ])
+# else:
+#   google_credentials = ''
