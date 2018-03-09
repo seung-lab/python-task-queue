@@ -142,7 +142,7 @@ class TaskQueue(ThreadedQueue):
     def cancel_lease(self, task):
         return self._api.cancel_lease(task)
 
-    def lease(self, num_tasks=1, tag=None):
+    def lease(self, seconds=600, num_tasks=1, tag=None):
         """
         Acquires a lease on the topmost N unowned tasks in the specified queue.
         Required query parameters: leaseSecs, numTasks
@@ -150,7 +150,7 @@ class TaskQueue(ThreadedQueue):
         tag = tag if tag else None
         tasks = self._api.lease(
             numTasks=num_tasks, 
-            seconds=600,
+            seconds=seconds,
             groupByTag=(tag is not None),
             tag=tag,
         )

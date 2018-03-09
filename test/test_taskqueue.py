@@ -19,9 +19,9 @@ else:
   QUEUE_NAME = 'travis-pull-queue-2'
 
 
-QTYPES = ('appengine', 'aws', 'google')
+QTYPES = ('appengine', 'aws')#, 'google')
 
-QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-pull-queue'
+QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
 
 def test_get():
   global QUEUE_NAME
