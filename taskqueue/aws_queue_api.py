@@ -15,11 +15,13 @@ class AWSTaskQueueAPI(object):
             raise ValueError(str(qurl) + ' is not a valid SQS url.')
         region_name, = matches.groups()
 
+        credentials = aws_credentials()
+
         self._qurl = qurl
         self._sqs = boto3.client('sqs', 
             region_name=region_name, 
-            aws_secret_access_key=aws_credentials['AWS_SECRET_ACCESS_KEY'],
-            aws_access_key_id=aws_credentials['AWS_ACCESS_KEY_ID'],
+            aws_secret_access_key=credentials['AWS_SECRET_ACCESS_KEY'],
+            aws_access_key_id=credentials['AWS_ACCESS_KEY_ID'],
         )    
 
     @property

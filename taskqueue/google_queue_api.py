@@ -20,7 +20,8 @@ class GoogleSessionConnectionPool(ConnectionPool):
         # scopes needed
         # 'https://www.googleapis.com/auth/cloud-platform',
         #  'https://www.googleapis.com/auth/cloud-tasks',
-        return AuthorizedSession(google_credentials)
+        project, credentials = google_credentials()
+        return AuthorizedSession(credentials)
     
     def _close_function(self):
         return lambda conn: conn.close()
