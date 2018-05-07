@@ -1,9 +1,9 @@
-cloud-volume>=0.10.1
+cloud-volume>=0.20.2
 google-api-python-client
 google-cloud>=0.32
 google-auth-httplib2==0.0.2
-numpy>=1.13.3
+numpy>=1.14.3
 pytest>=3.3.1
 pbr
-tqdm==4.19.5
+tqdm==4.23.2
 requests>2,<3
