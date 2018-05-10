@@ -77,13 +77,17 @@ class RegisteredTask(with_metaclass(Meta)):
         return string + ")"  
 
 class PrintTask(RegisteredTask):
-    def __init__(self):
+    def __init__(self, txt=''):
         super(PrintTask, self).__init__()
+        self.txt = txt
     def execute(self):
-        print(self)
+        if self.txt:
+            print(str(self) + ": " + str(self.txt))
+        else:
+            print(self)
 
 class MockTask(RegisteredTask):
-    def __init__(self):
+    def __init__(self, *args):
         super(MockTask, self).__init__()
     def execute(self):
         pass

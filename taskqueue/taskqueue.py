@@ -4,8 +4,11 @@ import six
 import json
 from functools import partial
 
+import concurrent.futures 
+import multiprocessing as mp
 import googleapiclient.errors
 import numpy as np
+from tqdm import tqdm
 
 from cloudvolume.threaded_queue import ThreadedQueue
 
@@ -16,7 +19,6 @@ from .registered_task import RegisteredTask, payloadBase64Decode
 from .secrets import PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE
 
 def totask(task):
-    print(task)
     taskobj = payloadBase64Decode(task['payloadBase64'])
     taskobj._id = task['id']
     return taskobj
@@ -231,3 +233,36 @@ class MockTaskQueue(object):
 
     def __exit__(self, exception_type, exception_value, traceback):
       pass
+
+class LocalTaskQueue(object):
+    def __init__(self, parallel=1, queue_name='', queue_server='', progress=True):
+        if parallel and type(parallel) == bool:
+            parallel = mp.cpu_count()
+
+        self.parallel = parallel
+        self.queue = []
+        self.progress = progress
+
+    def insert(self, task):
+        self.queue.append(task)
+
+    def wait(self, progress=None):
+      return self
+
+    def kill_threads(self):
+      return self
+
+    def __enter__(self):
+      return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        with tqdm(total=len(self.queue), desc="Tasks") as pbar:
+            with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
+                for _ in executor.map(task_execute, self.queue):
+                    pbar.update()
+        self.queue = []
+
+# Necessary to define here to make the 
+# function picklable
+def task_execute(task):
+    task.execute()

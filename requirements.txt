@@ -2,8 +2,8 @@ cloud-volume>=0.20.2
 google-api-python-client
 google-cloud>=0.32
 google-auth-httplib2==0.0.2
-numpy>=1.14.3
+numpy>=1.13.1
 pytest>=3.3.1
 pbr
-tqdm==4.23.2
+-e git+https://github.com/seung-lab/tqdm.git#egg=tqdm
 requests>2,<3
