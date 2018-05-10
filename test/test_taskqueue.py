@@ -4,7 +4,7 @@ import time
 from six.moves import range
 import pytest
 
-from taskqueue import RegisteredTask, TaskQueue, PrintTask
+from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 from taskqueue import QUEUE_NAME
 
 TRAVIS_BRANCH = None if 'TRAVIS_BRANCH' not in os.environ else os.environ['TRAVIS_BRANCH']
@@ -98,3 +98,9 @@ def test_400_errors():
     with TaskQueue(n_threads=1, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL) as tq:
       tq.delete('nonexistent')
 
+def test_local_taskqueue():
+  with LocalTaskQueue(parallel=True, progress=False) as tq:
+    for i in range(20000):
+      tq.insert(
+        MockTask(i)
+      )
