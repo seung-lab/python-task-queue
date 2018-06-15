@@ -23,6 +23,15 @@ QTYPES = ('appengine', 'aws')#, 'google')
 
 QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
 
+def test_task_creation():
+  task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
+               serialization=('i', 's', 's', 'u', 'e', 's'), with_kwargs=None)
+  task_str = task.serialize()
+  assert task_str == '{"this": "is", "a": [1, 4, 2], ' \
+                     '"simple": {"test": "to", "check": 4}, ' \
+                     '"serialization": ["i", "s", "s", "u", "e", "s"], ' \
+                     '"with_kwargs": null, "class": "MockTask"}'
+
 def test_get():
   global QUEUE_NAME
 
@@ -102,5 +111,5 @@ def test_local_taskqueue():
   with LocalTaskQueue(parallel=True, progress=False) as tq:
     for i in range(20000):
       tq.insert(
-        MockTask(i)
+        MockTask(arg=i)
       )
