@@ -34,8 +34,9 @@ class Meta(type):
         return cls
 
 class RegisteredTask(with_metaclass(Meta)):
-    def __init__(self, *arg_values):
+    def __init__(self, *arg_values, **kwarg_values):
         self._args = OrderedDict(zip(self._arg_names, arg_values))
+        self._args.update(kwarg_values)
 
     @classmethod
     def deserialize(cls, base64data):
@@ -87,7 +88,7 @@ class PrintTask(RegisteredTask):
             print(self)
 
 class MockTask(RegisteredTask):
-    def __init__(self, *args):
-        super(MockTask, self).__init__()
+    def __init__(self, **kwargs):
+        super(MockTask, self).__init__(**kwargs)
     def execute(self):
         pass
