@@ -27,10 +27,14 @@ def test_task_creation():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
                serialization=('i', 's', 's', 'u', 'e', 's'), with_kwargs=None)
   task_str = task.serialize()
-  assert task_str == '{"this": "is", "a": [1, 4, 2], ' \
-                     '"simple": {"test": "to", "check": 4}, ' \
-                     '"serialization": ["i", "s", "s", "u", "e", "s"], ' \
-                     '"with_kwargs": null, "class": "MockTask"}'
+  task_deserialized = MockTask.deserialize(task_str)
+
+  assert task_deserialized._args == {
+      "this": "is", "a": [1, 4, 2],
+      "simple": {"test": "to", "check": 4},
+      "serialization": ["i", "s", "s", "u", "e", "s"],
+      "with_kwargs": None
+  }
 
 def test_get():
   global QUEUE_NAME
