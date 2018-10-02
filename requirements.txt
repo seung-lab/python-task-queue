@@ -1,4 +1,5 @@
 cloud-volume>=0.20.2
+google-api-python-client
 numpy>=1.13.1
 pytest>=3.3.1
 pbr
