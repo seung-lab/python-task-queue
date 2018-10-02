@@ -3,7 +3,10 @@ Python TaskQueue object that can rapidly populate and download from cloud queues
 
 # Installation
 
-`pip install taskqueue` 
+```bash
+pip install numpy # make sure you do this first on a seperate line
+pip install taskqueue
+```
 
 The task queue uses your CloudVolume secrets located in `$HOME/.cloudvolume/secrets/`. When using AWS SQS as your queue backend, you must provide `$HOME/.cloudvolume/secrets/aws-secret.json`. See the [CloudVolume](https://github.com/seung-lab/cloud-volume) repo for additional instructions.
 
