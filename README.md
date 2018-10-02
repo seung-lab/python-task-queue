@@ -14,10 +14,13 @@ Here's an example implementation of a `PrintTask`. Generally, you should specify
 container and let the actual execution download and manipulate data.
 
 ```python
+from taskqueue import RegisteredTask
+
 class PrintTask(RegisteredTask):
   def __init__(self, txt=''):
-    super(PrintTask, self).__init__()
+    super(PrintTask, self).__init__(txt)
     self.txt = txt
+
   def execute(self):
     if self.txt:
       print(str(self) + ": " + str(self.txt))
