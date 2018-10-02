@@ -1,6 +1,19 @@
 CHANGES
 =======
 
+0.6.0
+-----
+
+* fix: test\_task\_creation independent of dict order (#10)
+* fix: serialization of kwargs (#7)
+* docs: how to use in README.md
+
+0.5.0
+-----
+
+* feat: Multiprocess LocalTaskQueue (#6)
+* chore: bump requirements
+
 0.4.1
 -----
 
