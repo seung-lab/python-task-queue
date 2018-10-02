@@ -3,7 +3,9 @@ Python TaskQueue object that can rapidly populate and download from cloud queues
 
 # Installation
 
-`pip install taskqueue`
+`pip install taskqueue` 
+
+The task queue uses your CloudVolume secrets located in `$HOME/.cloudvolume/secrets/`. When using AWS SQS as your queue backend, you must provide `$HOME/.cloudvolume/secrets/aws-secret.json`. See the [CloudVolume](https://github.com/seung-lab/cloud-volume) repo for additional instructions.
 
 # Usage 
 
@@ -32,6 +34,8 @@ class PrintTask(RegisteredTask):
 
 For small jobs, you might want to use one or more processes to execute the tasks:
 ```python
+from taskqueue import LocalTaskQueue
+
 with LocalTaskQueue(parallel=5) as tq: # use 5 processes
   for _ in range(1000):
     tq.insert(
@@ -45,6 +49,8 @@ This will load the queue with 1000 print tasks then execute them across five pro
 Set up an SQS queue and acquire an aws-secret.json that is compatible with CloudVolume.
 
 ```python
+from taskqueue import TaskQueue
+
 qurl = 'https://sqs.us-east-1.amazonaws.com/$DIGITS/$QUEUE_NAME'
 with TaskQueue(queue_server='sqs', qurl=qurl) as tq:
   for _ in range(1000):
@@ -56,6 +62,8 @@ This inserts 1000 PrintTask descriptions into your SQS queue.
 Somewhere else, you'll do the following (probably across multiple workers):
 
 ```python
+from taskqueue import TaskQueue
+
 qurl = 'https://sqs.us-east-1.amazonaws.com/$DIGITS/$QUEUE_NAME'
 with TaskQueue(queue_server='sqs', qurl=qurl) as tq:
   task = tq.lease(seconds=int($LEASE_SECONDS))
