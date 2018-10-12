@@ -1,6 +1,19 @@
 CHANGES
 =======
 
+0.7.0
+-----
+
+* test: switching to new credentials
+* fix: add back google-api-python-client
+* docs: more info on CloudVolume dependency
+* docs: added info on CloudVolume dependency
+* test: install numpy first for CloudVolume compatibility
+* docs: more explicit about how to set up secrets
+* docs: made PrintTask example more explicit
+* docs: update readme to be more general
+* feat: remove broken Google support
+
 0.6.0
 -----
 
