@@ -33,10 +33,14 @@ class AWSTaskQueueAPI(object):
 
   @property
   def enqueued(self):
-    return int(self.status()['ApproximateNumberOfMessages'])
+    status = self.status()
+    return int(status['ApproximateNumberOfMessages']) + int(status['ApproximateNumberOfMessagesNotVisible'])
 
   def status(self):
-    resp = self._sqs.get_queue_attributes(QueueUrl=self._qurl, AttributeNames=['ApproximateNumberOfMessages'])
+    resp = self._sqs.get_queue_attributes(
+      QueueUrl=self._qurl, 
+      AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
+    )
     return resp['Attributes']
 
   def insert(self, task):
