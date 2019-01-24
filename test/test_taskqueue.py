@@ -1,3 +1,4 @@
+import json
 import os
 import time
 
@@ -19,15 +20,16 @@ else:
   QUEUE_NAME = 'travis-pull-queue-2'
 
 
-QTYPES = ('appengine', 'aws')#, 'google')
+QTYPES = ('aws',)#, 'google')
 
 QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
 
 def test_task_creation():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
                serialization=('i', 's', 's', 'u', 'e', 's'), with_kwargs=None)
-  task_str = task.serialize()
-  task_deserialized = MockTask.deserialize(task_str)
+  payload = task.payload()
+  payload = json.dumps(payload)
+  task_deserialized = MockTask.deserialize(payload)
 
   assert task_deserialized._args == {
       "this": "is", "a": [1, 4, 2],

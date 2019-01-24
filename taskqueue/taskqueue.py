@@ -12,16 +12,15 @@ from tqdm import tqdm
 
 from cloudvolume.threaded_queue import ThreadedQueue
 
-from .appengine_queue_api import AppEngineTaskQueueAPI
 from .aws_queue_api import AWSTaskQueueAPI
-from .registered_task import RegisteredTask, payloadBase64Decode
+from .registered_task import RegisteredTask, deserialize
 from .secrets import (
   PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE,
   AWS_DEFAULT_REGION
 )
 
 def totask(task):
-  taskobj = payloadBase64Decode(task['payloadBase64'])
+  taskobj = deserialize(task['payload'])
   taskobj._id = task['id']
   return taskobj
 
@@ -60,9 +59,7 @@ class TaskQueue(ThreadedQueue):
   # This is key to making sure threading works. Don't refactor this method away.
   def _initialize_interface(self):
     server = self._queue_server.lower()
-    if server == 'appengine':
-      return AppEngineTaskQueueAPI(project=self._project, queue_name=self._queue_name)
-    elif server in ('pull-queue', 'google'):
+    if server in ('pull-queue', 'google'):
       return NotImplementedError("Google Cloud Tasks are not supported at this time.")
     elif server in ('sqs', 'aws'):
       qurl = self._qurl if self._qurl else self._queue_name
@@ -106,7 +103,7 @@ class TaskQueue(ThreadedQueue):
     Insert a task into an existing queue.
     """
     body = {
-      "payloadBase64": task.payloadBase64.decode('utf8'),
+      "payload": task.payload(),
       "queueName": self._queue_name,
       "groupByTag": True,
       "tag": task.__class__.__name__
