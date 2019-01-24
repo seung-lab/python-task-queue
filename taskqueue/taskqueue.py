@@ -43,8 +43,10 @@ class TaskQueue(ThreadedQueue):
     def __init__(self):
       super(LookupError, self).__init__('Queue Empty')
 
-  def __init__(self, n_threads=40, project=PROJECT_NAME, region=None,
-         queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE, qurl=None):
+  def __init__(
+    self, queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE, 
+    region=None, qurl=None, n_threads=40, project=PROJECT_NAME
+  ):
 
     self._project = project
     self._region = region
