@@ -15,7 +15,7 @@ def deserialize(data):
   if type(data) is bytes:
     data = data.decode('utf8')
 
-  if isinstance(data, str):
+  if isinstance(data, six.string_types):
     data = json.loads(data)
 
   name = data['class']
