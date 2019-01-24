@@ -7,22 +7,29 @@ import botocore
 from .secrets import aws_credentials
 
 class AWSTaskQueueAPI(object):
-  def __init__(self, qurl):
-    """qurl looks like https://sqs.us-east-1.amazonaws.com/DIGITS/wms-pull-queue"""
+  def __init__(self, qurl, region_name=None):
+    """
+    qurl: either a queue name (e.g. 'pull_queue') or a url
+      like https://sqs.us-east-1.amazonaws.com/DIGITS/wms-pull-queue
+    """
     matches = re.search(r'sqs.([\w\d-]+).amazonaws', qurl)
 
-    if matches is None:
-      raise ValueError(str(qurl) + ' is not a valid SQS url.')
-    region_name, = matches.groups()
+    if matches is not None:
+      region_name, = matches.groups()
+      self._qurl = qurl
+    else:
+      self._qurl = None
 
     credentials = aws_credentials()
-
-    self._qurl = qurl
+   
     self._sqs = boto3.client('sqs', 
       region_name=region_name, 
       aws_secret_access_key=credentials['AWS_SECRET_ACCESS_KEY'],
       aws_access_key_id=credentials['AWS_ACCESS_KEY_ID'],
     )    
+
+    if self._qurl is None:
+      self._qurl = self._sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
 
   @property
   def enqueued(self):

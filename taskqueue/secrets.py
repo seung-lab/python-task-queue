@@ -14,5 +14,5 @@ QUEUE_NAME = 'pull-queue' if 'PIPELINE_USER_QUEUE' not in os.environ else os.env
 TEST_QUEUE_NAME = 'test-pull-queue' if 'TEST_PIPELINE_USER_QUEUE' not in os.environ else os.environ['TEST_PIPELINE_USER_QUEUE']
 QUEUE_TYPE = 'sqs' if 'QUEUE_TYPE' not in os.environ else os.environ['QUEUE_TYPE']
 APPENGINE_QUEUE_URL = 'https://queue-dot-neuromancer-seung-import.appspot.com'
-
+AWS_DEFAULT_REGION = 'us-east-1' if 'AWS_DEFAULT_REGION' not in os.environ else os.environ['AWS_DEFAULT_REGION']
 

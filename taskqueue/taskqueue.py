@@ -15,7 +15,10 @@ from cloudvolume.threaded_queue import ThreadedQueue
 from .appengine_queue_api import AppEngineTaskQueueAPI
 from .aws_queue_api import AWSTaskQueueAPI
 from .registered_task import RegisteredTask, payloadBase64Decode
-from .secrets import PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE
+from .secrets import (
+  PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE,
+  AWS_DEFAULT_REGION
+)
 
 def totask(task):
   taskobj = payloadBase64Decode(task['payloadBase64'])
@@ -60,7 +63,9 @@ class TaskQueue(ThreadedQueue):
     elif server in ('pull-queue', 'google'):
       return NotImplementedError("Google Cloud Tasks are not supported at this time.")
     elif server in ('sqs', 'aws'):
-      return AWSTaskQueueAPI(qurl=self._qurl)
+      qurl = self._qurl if self._qurl else self._queue_name
+      region = self._region if self._region else AWS_DEFAULT_REGION
+      return AWSTaskQueueAPI(qurl=qurl, region_name=region)
     else:
       raise NotImplementedError('Unknown server ' + self._queue_server)
 
