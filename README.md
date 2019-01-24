@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/seung-lab/python-task-queue.svg?branch=master)](https://travis-ci.org/seung-lab/python-task-queue)
+[![Build Status](https://travis-ci.org/seung-lab/python-task-queue.svg?branch=master)](https://travis-ci.org/seung-lab/python-task-queue) [![PyPI version](https://badge.fury.io/py/task-queue.svg)](https://badge.fury.io/py/task-queue) 
 
 # python-task-queue
 Python TaskQueue object that can rapidly populate and download from cloud queues. Supports local multi-process execution as well.
