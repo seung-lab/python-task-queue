@@ -30,7 +30,7 @@ class Meta(type):
   def __new__(meta, name, bases, class_dict):
     cls = type.__new__(meta, name, bases, class_dict)
     register_class(cls)
-    cls._arg_names = inspect.getargspec(class_dict['__init__'])[0][1:]
+    cls._arg_names = inspect.getfullargspec(class_dict['__init__'])[0][1:]
     return cls
 
 class RegisteredTask(with_metaclass(Meta)):
