@@ -1,8 +1,13 @@
 from __future__ import print_function
 
 import six
-import json
+
 from functools import partial
+import json
+import random
+import signal
+import time
+import traceback
 
 import concurrent.futures 
 import multiprocessing as mp
@@ -23,6 +28,8 @@ def totask(task):
   taskobj = deserialize(task['payload'])
   taskobj._id = task['id']
   return taskobj
+
+LEASE_SECONDS = 300
 
 class TaskQueue(ThreadedQueue):
   """
@@ -55,6 +62,14 @@ class TaskQueue(ThreadedQueue):
     self._api = self._initialize_interface()
 
     super(TaskQueue, self).__init__(n_threads) # creates self._queue
+
+  @property
+  def queue_name(self):
+    return self._queue_name
+  
+  @property
+  def queue_server(self):
+    return self._queue_server
 
   # This is key to making sure threading works. Don't refactor this method away.
   def _initialize_interface(self):
@@ -217,6 +232,81 @@ class TaskQueue(ThreadedQueue):
 
     return self
 
+  def poll(
+    self, lease_seconds=LEASE_SECONDS, tag=None, 
+    verbose=False, execute_args=[], execute_kwargs={}, 
+    stop_fn=None, backoff_exceptions=[], min_backoff_window=30, 
+    max_backoff_window=120, log_fn=None
+  ):
+    global LOOP
+
+    if not callable(stop_fn) and stop_fn is not None:
+      raise ValueError("stop_fn must be a callable. " + str(stop_fn))
+    elif not callable(stop_fn):
+      stop_fn = lambda: False
+
+    def random_exponential_window_backoff(n):
+      n = min(n, min_backoff_window)
+      # 120 sec max b/c on avg a request every ~250msec if 500 containers 
+      # in contention which seems like a quite reasonable volume of traffic 
+      # to handle
+      high = min(2 ** n, max_backoff_window) 
+      return random.uniform(0, high)
+
+    def printv(*args, **kwargs):
+      if verbose:
+        print(*args, **kwargs)
+
+    LOOP = True
+
+    def sigint_handler(signum, frame):
+      global LOOP
+      printv("Interrupted. Exiting after this task completes...")
+      LOOP = False
+    
+    prev_sigint_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, sigint_handler)
+
+    if log_fn is None:
+      log_fn = printv
+
+    tries = 0
+    executed = 0
+
+    backoff = False
+    backoff_exceptions = tuple(list(backoff_exceptions) + [ TaskQueue.QueueEmpty ])
+
+    while LOOP:
+      task = 'unknown' # for error message prior to leasing
+      try:
+        task = self.lease(seconds=int(lease_seconds))
+        tries += 1
+        printv(task)
+        task.execute(*execute_args, **execute_kwargs)
+        executed += 1
+        printv("Delete enqueued task...")
+        self.delete(task)
+        log_fn('INFO', task , "succesfully executed")
+        tries = 0
+      except backoff_exceptions:
+        backoff = True
+      except Exception as e:
+        printv('ERROR', task, "raised {}\n {}".format(e , traceback.format_exc()))
+        raise #this will restart the container in kubernetes
+        
+      if stop_fn():
+        break
+
+      if backoff:
+        time.sleep(random_exponential_window_backoff(tries))
+
+      backoff = False
+
+    printv("Task execution loop exited.")
+    signal.signal(signal.SIGINT, prev_sigint_handler)
+
+    return executed
+
 class MockTaskQueue(object):
   def __init__(self, *args, **kwargs):
     pass
@@ -225,7 +315,20 @@ class MockTaskQueue(object):
     task.execute()
     del task
 
+  def poll(
+    self, lease_seconds=LEASE_SECONDS, tag=None, 
+    verbose=False, execute_args=[], execute_kwargs={}
+  ):
+    return self
+
+
   def wait(self, progress=None):
+    return self
+
+  def poll(
+    self, lease_seconds=LEASE_SECONDS, tag=None, 
+    verbose=False, execute_args=[], execute_kwargs={}
+  ):
     return self
 
   def kill_threads(self):
