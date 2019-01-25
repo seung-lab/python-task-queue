@@ -81,8 +81,9 @@ class RegisteredTask(with_metaclass(Meta)):
 
 class PrintTask(RegisteredTask):
   def __init__(self, txt=''):
-    super(PrintTask, self).__init__()
+    super(PrintTask, self).__init__(txt)
     self.txt = txt
+    
   def execute(self):
     if self.txt:
       print(str(self) + ": " + str(self.txt))
