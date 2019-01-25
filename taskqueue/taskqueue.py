@@ -11,7 +11,6 @@ import traceback
 
 import concurrent.futures 
 import multiprocessing as mp
-import googleapiclient.errors
 import numpy as np
 from tqdm import tqdm
 
@@ -98,21 +97,6 @@ class TaskQueue(ThreadedQueue):
     """
     return self._api.enqueued
     
-  def _consume_queue_execution(self, fn):
-    try:
-      super(self.__class__, self)._consume_queue_execution(fn)
-    except googleapiclient.errors.HttpError as httperr:
-      # Retry if Timeout, Service Unavailable, or ISE
-      # ISEs can happen from flooding or other issues that
-      # aren't the fault of the request.
-      if httperr.resp.status in (408, 500, 503): 
-        self.put(fn)
-      elif httperr.resp.status == 400:
-        if not re.search('task name is invalid', repr(httperr.content), flags=re.IGNORECASE):
-          raise
-      else:
-        raise
-
   def insert(self, task):
     """
     Insert a task into an existing queue.
@@ -325,12 +309,6 @@ class MockTaskQueue(object):
   def wait(self, progress=None):
     return self
 
-  def poll(
-    self, lease_seconds=LEASE_SECONDS, tag=None, 
-    verbose=False, execute_args=[], execute_kwargs={}
-  ):
-    return self
-
   def kill_threads(self):
     return self
 
@@ -353,6 +331,12 @@ class LocalTaskQueue(object):
     self.queue.append(task)
 
   def wait(self, progress=None):
+    return self
+
+  def poll(
+    self, lease_seconds=LEASE_SECONDS, tag=None, 
+    verbose=False, execute_args=[], execute_kwargs={}
+  ):
     return self
 
   def kill_threads(self):
