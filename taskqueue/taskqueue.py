@@ -222,6 +222,29 @@ class TaskQueue(ThreadedQueue):
     stop_fn=None, backoff_exceptions=[], min_backoff_window=30, 
     max_backoff_window=120, log_fn=None
   ):
+    """
+    Poll a queue until a stop condition is reached (default forever). Note
+    that this function is not thread safe as it requires a global variable
+    to intercept SIGINT.
+
+    lease_seconds: each task should be leased for this many seconds
+    tag: if specified, query for only tasks that match this tag
+    execute_args / execute_kwargs: pass these arguments to task execution
+    backoff_exceptions: A list of exceptions that instead of causing a crash,
+      instead cause the polling to back off for an increasing exponential 
+      random window.
+    min_backoff_window: The minimum sized window (in seconds) to select a 
+      random backoff time. 
+    max_backoff_window: The window doubles each retry. This is the maximum value
+      in seconds.
+    stop_fn: A boolean returning function that accepts no parameters. When
+      it returns True, the task execution loop will terminate. It is evaluated
+      once after every task.
+    log_fn: Feed error messages to this function, default print (when verbose is enabled).
+    verbose: print out the status of each step
+
+    Return: number of tasks executed
+    """
     global LOOP
 
     if not callable(stop_fn) and stop_fn is not None:
@@ -299,12 +322,8 @@ class MockTaskQueue(object):
     task.execute()
     del task
 
-  def poll(
-    self, lease_seconds=LEASE_SECONDS, tag=None, 
-    verbose=False, execute_args=[], execute_kwargs={}
-  ):
+  def poll(self, *args, **kwargs):
     return self
-
 
   def wait(self, progress=None):
     return self
@@ -333,11 +352,8 @@ class LocalTaskQueue(object):
   def wait(self, progress=None):
     return self
 
-  def poll(
-    self, lease_seconds=LEASE_SECONDS, tag=None, 
-    verbose=False, execute_args=[], execute_kwargs={}
-  ):
-    return self
+  def poll(self, *args, **kwargs):
+    pass
 
   def kill_threads(self):
     return self
