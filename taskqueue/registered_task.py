@@ -40,6 +40,9 @@ class RegisteredTask(with_metaclass(Meta)):
   def __init__(self, *args, **kwargs):
     self._args = OrderedDict(zip(self._arg_names, args))
     self._args.update(kwargs)
+
+    for k,v in six.iteritems(self._args):
+      self.__dict__[k] = v
   
   @classmethod
   def deserialize(cls, data):
@@ -54,6 +57,8 @@ class RegisteredTask(with_metaclass(Meta)):
           dictionary[key] = val.tolist()
         elif isinstance(val, dict):
           dictionary[key] = denumpy(val)
+        elif hasattr(val, 'serialize') and callable(val.serialize):
+          dictionary[key] = val.serialize()
       return dict(dictionary)
 
     argcpy = copy.deepcopy(self._args)
@@ -83,7 +88,7 @@ class PrintTask(RegisteredTask):
   def __init__(self, txt=''):
     super(PrintTask, self).__init__(txt)
     self.txt = txt
-    
+
   def execute(self):
     if self.txt:
       print(str(self) + ": " + str(self.txt))
