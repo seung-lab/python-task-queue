@@ -314,6 +314,10 @@ class TaskQueue(ThreadedQueue):
 
     return executed
 
+  def block_until_empty(self, interval_sec=2):
+    while self.enqueued > 0:
+      time.sleep(interval_sec)
+
 class MockTaskQueue(object):
   def __init__(self, *args, **kwargs):
     pass
