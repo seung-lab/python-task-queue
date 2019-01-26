@@ -1,6 +1,39 @@
 CHANGES
 =======
 
+0.10.0
+------
+
+* feat: automatic serialization for objects with 'serialize'
+
+0.9.1
+-----
+
+* chore: fix \_\_version\_\_ specification
+
+0.9.0
+-----
+
+* feat: add \_\_version\_\_ number
+* refactor: remove old google code to remove a dependency
+* feat: add "poll" method based on igneous's task\_execution model
+* fix: PrintTask initialize arguments
+
+0.8.0
+-----
+
+* fix: actual backwards compatibility with python2
+* docs: pip installation instructions were pointing to wrong package
+* docs: add PyPI badge
+* fix: generalize string types for python2 and 3
+* refactor: drop appengine support, base64encoding
+* docs: add Travis CI badge to README
+* fix: enqueued measures both visible and non-visible messages on aws
+* refactor: upgrade to inspect.getfullargspec
+* refactor: move queue\_name and queue\_server to first arguments
+* feat: allow specification of SQS queues via queue name only
+* chore: change tab width to 2
+
 0.7.0
 -----
 
