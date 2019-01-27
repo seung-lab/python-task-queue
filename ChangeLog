@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+0.11.0
+------
+
+* chore: version 0.11.0
+* feat: block\_until\_empty() which polls every 2 seconds by default
+* docs: docstring for poll function
+
 0.10.0
 ------
 
