@@ -62,6 +62,8 @@ class RegisteredTask(with_metaclass(Meta)):
       return dict(dictionary)
 
     argcpy = copy.deepcopy(self._args)
+    for k,v in six.iteritems(self._args):
+      argcpy[k] = self.__dict__[k]
     argcpy['class'] = self.__class__.__name__
 
     return denumpy(argcpy)

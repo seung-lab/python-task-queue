@@ -26,7 +26,8 @@ QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
 
 def test_task_creation():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
-               serialization=('i', 's', 's', 'u', 'e', 's'), with_kwargs=None)
+               serialization=('i', 's', 's', 'u', 'e', 's'), wow=4, with_kwargs=None)
+  task.wow = 5
   payload = task.payload()
   payload = json.dumps(payload)
   task_deserialized = MockTask.deserialize(payload)
@@ -35,6 +36,7 @@ def test_task_creation():
       "this": "is", "a": [1, 4, 2],
       "simple": {"test": "to", "check": 4},
       "serialization": ["i", "s", "s", "u", "e", "s"],
+      "wow": 5,
       "with_kwargs": None
   }
 
