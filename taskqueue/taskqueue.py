@@ -325,7 +325,11 @@ class MockTaskQueue(object):
     pass
 
   def insert(self, task, args=[], kwargs={}):
-    task = totask(task.payload()) # to ensure conformity with TaskQueue
+    task = {
+      'payload': task.payload(),
+      'id': -1,
+    }
+    task = totask(task) # to ensure conformity with TaskQueue
     task.execute(*args, **kwargs)
     del task
 
@@ -355,7 +359,12 @@ class LocalTaskQueue(object):
 
   def insert(self, task, args=[], kwargs={}):
     # task.payload to ensure conformity with TaskQueue
-    self.queue.append( (task.payload(), args, kwargs) )
+    task = {
+      'payload': task.payload(),
+      'id': -1,
+    }
+
+    self.queue.append( (task, args, kwargs) )
 
   def wait(self, progress=None):
     return self

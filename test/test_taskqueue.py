@@ -6,7 +6,7 @@ from six.moves import range
 import pytest
 
 import taskqueue
-from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
+from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue, MockTaskQueue
 from taskqueue import QUEUE_NAME
 
 TRAVIS_BRANCH = None if 'TRAVIS_BRANCH' not in os.environ else os.environ['TRAVIS_BRANCH']
@@ -27,7 +27,7 @@ QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
 
 class ExecutePrintTask(RegisteredTask):
   def __init__(self):
-    super().__init__()
+    super(ExecutePrintTask, self).__init__()
 
   def execute(self, wow, wow2):
     print(wow + wow2)
@@ -154,4 +154,8 @@ def test_local_taskqueue():
 
   with LocalTaskQueue(parallel=True, progress=False) as tq:
     for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4})
+      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+
+  with MockTaskQueue(parallel=True, progress=False) as tq:
+    for i in range(200):
+      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
