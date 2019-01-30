@@ -97,7 +97,7 @@ class TaskQueue(ThreadedQueue):
     """
     return self._api.enqueued
     
-  def insert(self, task):
+  def insert(self, task, args=[], kwargs={}):
     """
     Insert a task into an existing queue.
     """
@@ -322,8 +322,8 @@ class MockTaskQueue(object):
   def __init__(self, *args, **kwargs):
     pass
 
-  def insert(self, task):
-    task.execute()
+  def insert(self, task, args=[], kwargs={}):
+    task.execute(*args, **kwargs)
     del task
 
   def poll(self, *args, **kwargs):
@@ -350,8 +350,8 @@ class LocalTaskQueue(object):
     self.queue = []
     self.progress = progress
 
-  def insert(self, task):
-    self.queue.append(task)
+  def insert(self, task, args=[], kwargs={}):
+    self.queue.append( (task, args, kwargs) )
 
   def wait(self, progress=None):
     return self
@@ -374,5 +374,6 @@ class LocalTaskQueue(object):
 
 # Necessary to define here to make the 
 # function picklable
-def task_execute(task):
-  task.execute()
+def task_execute(task_tuple):
+  task, args, kwargs = task_tuple
+  task.execute(*args, **kwargs)
