@@ -51,22 +51,32 @@ class RegisteredTask(with_metaclass(Meta)):
     return obj
 
   def payload(self):
-    def denumpy(dictionary):
-      for key, val in six.iteritems(dictionary):
+    def denumpy(obj):
+      try:
+        iter(obj)
+      except TypeError:
+        return obj
+
+      if isinstance(obj, list) or isinstance(obj, tuple):
+        return [ denumpy(x) for x in obj ] 
+
+      for key, val in six.iteritems(obj):
         if isinstance(val, np.ndarray):
-          dictionary[key] = val.tolist()
+          obj[key] = val.tolist()
         elif isinstance(val, dict):
-          dictionary[key] = denumpy(val)
+          obj[key] = denumpy(val)
+        elif isinstance(val, list):
+          obj[key] = [ denumpy(x) for x in val ]
         elif hasattr(val, 'serialize') and callable(val.serialize):
-          dictionary[key] = val.serialize()
-      return dict(dictionary)
+          obj[key] = val.serialize()
+      return obj
 
     argcpy = copy.deepcopy(self._args)
     for k,v in six.iteritems(self._args):
       argcpy[k] = self.__dict__[k]
     argcpy['class'] = self.__class__.__name__
 
-    return denumpy(argcpy)
+    return dict(denumpy(argcpy))
 
   @property
   def id(self):
