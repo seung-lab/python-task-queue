@@ -1,6 +1,14 @@
 CHANGES
 =======
 
+0.12.0
+------
+
+* chore: version 0.12.0
+* feat: multiprocess uploads
+* feat: pass arguments to execute for LocalTaskQueue and MockTaskQueue
+* feat: handle serialization in more data types in RegisteredTask
+
 0.11.1
 ------
 

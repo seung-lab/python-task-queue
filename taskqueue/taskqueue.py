@@ -325,6 +325,7 @@ class MockTaskQueue(object):
     pass
 
   def insert(self, task, args=[], kwargs={}):
+    task = totask(task.payload()) # to ensure conformity with TaskQueue
     task.execute(*args, **kwargs)
     del task
 
@@ -353,7 +354,8 @@ class LocalTaskQueue(object):
     self.progress = progress
 
   def insert(self, task, args=[], kwargs={}):
-    self.queue.append( (task, args, kwargs) )
+    # task.payload to ensure conformity with TaskQueue
+    self.queue.append( (task.payload(), args, kwargs) )
 
   def wait(self, progress=None):
     return self
@@ -378,6 +380,7 @@ class LocalTaskQueue(object):
 # function picklable
 def _task_execute(task_tuple):
   task, args, kwargs = task_tuple
+  task = totask(task)
   task.execute(*args, **kwargs)
 
 ## Multiprocess Upload
