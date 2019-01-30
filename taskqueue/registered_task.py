@@ -52,9 +52,17 @@ class RegisteredTask(with_metaclass(Meta)):
 
   def payload(self):
     def denumpy(obj):
+      if hasattr(obj, 'serialize') and callable(obj.serialize):
+        return obj.serialize()
+
       try:
         iter(obj)
       except TypeError:
+        return obj
+
+      if isinstance(obj, bytes):
+        return obj.decode('utf8')
+      elif isinstance(obj, str):
         return obj
 
       if isinstance(obj, list) or isinstance(obj, tuple):
@@ -69,6 +77,7 @@ class RegisteredTask(with_metaclass(Meta)):
           obj[key] = [ denumpy(x) for x in val ]
         elif hasattr(val, 'serialize') and callable(val.serialize):
           obj[key] = val.serialize()
+
       return obj
 
     argcpy = copy.deepcopy(self._args)

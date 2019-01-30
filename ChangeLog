@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+0.12.2
+------
+
+* fix: unable to deserialize tasks in LocalTaskQueue b/c missing payload key
+
 0.12.1
 ------
 
