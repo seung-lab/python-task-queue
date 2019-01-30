@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+0.11.1
+------
+
+* chore: update version to 0.11.1
+* fix: modifications of class attributes would not affect payload
+* chore: update changelog
+
 0.11.0
 ------
 

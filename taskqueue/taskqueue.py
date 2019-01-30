@@ -2,8 +2,10 @@ from __future__ import print_function
 
 import six
 
+import copy
 from functools import partial
 import json
+import math
 import random
 import signal
 import time
@@ -368,12 +370,52 @@ class LocalTaskQueue(object):
   def __exit__(self, exception_type, exception_value, traceback):
     with tqdm(total=len(self.queue), desc="Tasks") as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
-        for _ in executor.map(task_execute, self.queue):
+        for _ in executor.map(_task_execute, self.queue):
           pbar.update()
     self.queue = []
 
 # Necessary to define here to make the 
 # function picklable
-def task_execute(task_tuple):
+def _task_execute(task_tuple):
   task, args, kwargs = task_tuple
   task.execute(*args, **kwargs)
+
+## Multiprocess Upload
+
+def _scatter(sequence, n):
+  """Scatters elements of ``sequence`` into ``n`` blocks."""
+
+  output = []
+  chunklen = int(math.ceil(float(len(sequence)) / float(n)))
+
+  for i in range(n):
+    output.append(
+      copy.deepcopy(sequence[i*chunklen:(i+1)*chunklen])
+    )
+
+  return output
+
+def _upload_tasks_single_process(queue_name, tasks):
+  with TaskQueue(queue_name=queue_name, queue_server='sqs') as tq:
+    for task in tasks:
+      tq.insert(task)
+
+def upload(queue_name, tasks, parallel=16, progress=False):
+  if parallel == 0:
+    parallel = mp.cpu_count()
+  elif parallel < 0:
+    raise ValueError("Parallel must be a positive number or zero (all cpus). Got: " + str(parallel))
+
+  parallel = max(1, min(parallel, mp.cpu_count()))
+
+  if parallel == 1:
+    _upload_tasks_single_process(queue_name, tasks)
+  else:
+    uploadfn = partial(_upload_tasks_single_process, queue_name)
+    tasks = _scatter(tasks, parallel)
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as executor:
+      executor.map(uploadfn, tasks)
+
+
+

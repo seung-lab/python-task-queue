@@ -5,6 +5,7 @@ import time
 from six.moves import range
 import pytest
 
+import taskqueue
 from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 from taskqueue import QUEUE_NAME
 
@@ -23,6 +24,15 @@ else:
 QTYPES = ('aws',)#, 'google')
 
 QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
+
+class ExecutePrintTask(RegisteredTask):
+  def __init__(self):
+    super().__init__()
+
+  def execute(self, wow, wow2):
+    print(wow + wow2)
+    return wow + wow2
+
 
 def test_task_creation():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
@@ -109,6 +119,22 @@ def test_multi_threaded_insertion():
     if qtype != 'aws':
       assert tq.enqueued == 0
 
+def test_multiprocess_upload():
+  global QURL
+
+  num_tasks = 1000
+  tasks = [ PrintTask(i) for i in range(num_tasks) ]
+
+  taskqueue.upload(QURL, tasks, parallel=4)
+
+  tq = TaskQueue(QURL, n_threads=0)
+
+  time.sleep(0.25)
+  try:
+    assert tq.enqueued == num_tasks
+  finally:
+    tq.purge()
+
 def test_400_errors():
   global QUEUE_NAME
   for qtype in QTYPES:
@@ -121,3 +147,7 @@ def test_local_taskqueue():
       tq.insert(
         MockTask(arg=i)
       )
+
+  with LocalTaskQueue(parallel=True, progress=False) as tq:
+    for i in range(200):
+      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4})
