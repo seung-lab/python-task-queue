@@ -12,11 +12,12 @@ import time
 import traceback
 
 import concurrent.futures 
+import gevent.pool
 import multiprocessing as mp
 import numpy as np
 from tqdm import tqdm
 
-from cloudvolume.threaded_queue import ThreadedQueue
+from .scheduler import schedule_green_jobs
 
 from .aws_queue_api import AWSTaskQueueAPI
 from .registered_task import RegisteredTask, deserialize
@@ -32,7 +33,7 @@ def totask(task):
 
 LEASE_SECONDS = 300
 
-class TaskQueue(ThreadedQueue):
+class TaskQueue(object):
   """
   The standard usage is that a client calls lease to get the next available task,
   performs that task, and then calls task.delete on that task before the lease expires.
@@ -62,7 +63,7 @@ class TaskQueue(ThreadedQueue):
     self._qurl = qurl
     self._api = self._initialize_interface()
 
-    super(TaskQueue, self).__init__(n_threads) # creates self._queue
+    self._pool = gevent.pool.Pool(n_threads)
 
   @property
   def queue_name(self):
@@ -110,15 +111,37 @@ class TaskQueue(ThreadedQueue):
       "tag": task.__class__.__name__
     }
 
-    def cloud_insertion(api):
-      api.insert(body)
+    def cloud_insertion():
+      self._api.insert(body)
 
-    if len(self._threads):
-      self.put(cloud_insertion)
-    else:
-      cloud_insertion(self._api)
+    self._pool.spawn(cloud_insertion)
 
     return self
+
+  def insert_all(self, tasks):
+    bodies = []
+    for task in tasks:
+      bodies.append(
+         {
+          "payload": task.payload(),
+          "queueName": self._queue_name,
+          "groupByTag": True,
+          "tag": task.__class__.__name__
+         } 
+      )
+
+    def cloud_insertion(body):
+      self._api.insert(body)
+
+    fns = [ partial(cloud_insertion, body) for body in bodies ]
+
+    schedule_green_jobs(
+      fns=fns,
+      concurrency=20,
+      progress='Inserting',
+      total=len(fns),
+    )
+
 
   def status(self):
     """
@@ -319,6 +342,15 @@ class TaskQueue(ThreadedQueue):
   def block_until_empty(self, interval_sec=2):
     while self.enqueued > 0:
       time.sleep(interval_sec)
+
+  def wait(self):
+    self._pool.wait()
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exception_type, exception_value, traceback):
+    self._pool.wait()
 
 class MockTaskQueue(object):
   def __init__(self, *args, **kwargs):
