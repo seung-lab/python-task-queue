@@ -9,13 +9,11 @@ from .secrets import aws_credentials
 
 def toiter(obj):
   try:
-    iter(obj)
     if type(obj) is dict:
-      return [ obj ]
-    return obj 
+      return iter([ obj ])
+    return iter(obj)
   except TypeError:
-    return [ obj ]
-
+    return iter([ obj ])
 
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):
@@ -60,8 +58,14 @@ class AWSTaskQueueAPI(object):
     AWS_BATCH_SIZE = 10 
 
     resps = []
-    for i in range(0, len(tasks), AWS_BATCH_SIZE):
-      batch = tasks[AWS_BATCH_SIZE * i : AWS_BATCH_SIZE * (i+1)]
+    batch = []
+    while True:
+      batch.clear()
+      try:
+        for i in range(10):
+          batch.append(next(tasks))
+      except StopIteration:
+        pass
 
       if len(batch) == 0:
         break
