@@ -276,7 +276,7 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
     )
     ThreadedQueue.__init__(self, n_threads) # creates self._queue
     
-  def insert(self, task, args=[], kwargs={}):
+  def insert(self, task, args=[], kwargs={}, delay_seconds=20):
     """
     Insert a task into an existing queue.
     """
@@ -288,7 +288,7 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
     }
 
     def cloud_insertion(api):
-      api.insert(body)
+      api.insert(body, delay_seconds)
 
     if len(self._threads):
       self.put(cloud_insertion)
@@ -395,7 +395,7 @@ class GreenTaskQueue(SuperTaskQueue):
     gevent.monkey.patch_all()
         """))
 
-  def insert(self, task, args=[], kwargs={}):
+  def insert(self, task, args=[], kwargs={}, delay_seconds=20):
     """
     Insert a task into an existing queue.
     """
@@ -407,7 +407,7 @@ class GreenTaskQueue(SuperTaskQueue):
     }
 
     def cloud_insertion():
-      self._api.insert(body)
+      self._api.insert(body, delay_seconds)
 
     self._pool.spawn(cloud_insertion)
 
