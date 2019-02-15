@@ -6,6 +6,17 @@ import botocore
 
 from .secrets import aws_credentials
 
+
+def toiter(obj):
+  try:
+    iter(obj)
+    if type(obj) is dict:
+      return [ obj ]
+    return obj 
+  except TypeError:
+    return [ obj ]
+
+
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):
     """
@@ -43,13 +54,29 @@ class AWSTaskQueueAPI(object):
     )
     return resp['Attributes']
 
-  def insert(self, task):
-    resp = self._sqs.send_message(
-      QueueUrl=self._qurl,
-      DelaySeconds=0,
-      MessageBody=json.dumps(task),
-    )
-    return resp['MessageId']
+  def insert(self, tasks, delay_seconds=20):
+    tasks = toiter(tasks)
+
+    AWS_BATCH_SIZE = 10 
+
+    resps = []
+    for i in range(0, len(tasks), AWS_BATCH_SIZE):
+      batch = tasks[AWS_BATCH_SIZE * i : AWS_BATCH_SIZE * (i+1)]
+
+      if len(batch) == 0:
+        break
+
+      resp = self._sqs.send_message_batch(
+        QueueUrl=self._qurl,
+        Entries=[ {
+          "Id": str(j),
+          "MessageBody": json.dumps(task),
+          "DelaySeconds": delay_seconds,
+        } for j, task in enumerate(batch) ],
+      )
+      resps.append(resp)
+
+    return resps
 
   def renew_lease(self, seconds):
     raise NotImplementedError() 

@@ -17,10 +17,11 @@ import multiprocessing as mp
 import numpy as np
 from tqdm import tqdm
 
-from .scheduler import schedule_green_jobs
+from cloudvolume.threaded_queue import ThreadedQueue
 
 from .aws_queue_api import AWSTaskQueueAPI
 from .registered_task import RegisteredTask, deserialize
+from .scheduler import schedule_green_jobs, schedule_threaded_jobs
 from .secrets import (
   PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE,
   AWS_DEFAULT_REGION
@@ -31,47 +32,23 @@ def totask(task):
   taskobj._id = task['id']
   return taskobj
 
+class QueueEmpty(LookupError):
+  def __init__(self):
+    super(LookupError, self).__init__('Queue Empty')
+
 LEASE_SECONDS = 300
 
-class TaskQueue(object):
-  """
-  The standard usage is that a client calls lease to get the next available task,
-  performs that task, and then calls task.delete on that task before the lease expires.
-  If the client cannot finish the task before the lease expires,
-  and has a reasonable chance of completing the task,
-  it should call task.update before the lease expires.
-
-  If the client completes the task after the lease has expired,
-  it still needs to delete the task. 
-
-  Tasks should be designed to be idempotent to avoid errors 
-  if multiple clients complete the same task.
-  """
-  class QueueEmpty(LookupError):
-    def __init__(self):
-      super(LookupError, self).__init__('Queue Empty')
-
+class SuperTaskQueue(object):
   def __init__(
     self, queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE, 
     region=None, qurl=None, n_threads=40, project=PROJECT_NAME
   ):
-
     self._project = project
     self._region = region
     self._queue_name = queue_name
     self._queue_server = queue_server
     self._qurl = qurl
     self._api = self._initialize_interface()
-
-    self._pool = gevent.pool.Pool(n_threads)
-
-  @property
-  def queue_name(self):
-    return self._queue_name
-  
-  @property
-  def queue_server(self):
-    return self._queue_server
 
   # This is key to making sure threading works. Don't refactor this method away.
   def _initialize_interface(self):
@@ -86,10 +63,17 @@ class TaskQueue(object):
       raise NotImplementedError('Unknown server ' + self._queue_server)
 
   @property
+  def queue_name(self):
+    return self._queue_name
+  
+  @property
+  def queue_server(self):
+    return self._queue_server
+
+  @property
   def enqueued(self):
     """
     Returns the approximate(!) number of tasks enqueued in the cloud.
-
     WARNING: The number computed by Google is eventually
       consistent. It may return impossible numbers that
       are small deviations from the number in the queue.
@@ -99,49 +83,6 @@ class TaskQueue(object):
     Returns: (int) number of tasks in cloud queue
     """
     return self._api.enqueued
-    
-  def insert(self, task, args=[], kwargs={}):
-    """
-    Insert a task into an existing queue.
-    """
-    body = {
-      "payload": task.payload(),
-      "queueName": self._queue_name,
-      "groupByTag": True,
-      "tag": task.__class__.__name__
-    }
-
-    def cloud_insertion():
-      self._api.insert(body)
-
-    self._pool.spawn(cloud_insertion)
-
-    return self
-
-  def insert_all(self, tasks):
-    bodies = []
-    for task in tasks:
-      bodies.append(
-         {
-          "payload": task.payload(),
-          "queueName": self._queue_name,
-          "groupByTag": True,
-          "tag": task.__class__.__name__
-         } 
-      )
-
-    def cloud_insertion(body):
-      self._api.insert(body)
-
-    fns = [ partial(cloud_insertion, body) for body in bodies ]
-
-    schedule_green_jobs(
-      fns=fns,
-      concurrency=20,
-      progress='Inserting',
-      total=len(fns),
-    )
-
 
   def status(self):
     """
@@ -185,7 +126,7 @@ class TaskQueue(object):
     )
 
     if not len(tasks):
-      raise TaskQueue.QueueEmpty
+      raise QueueEmpty
 
     task = tasks[0]
     return totask(task)
@@ -212,35 +153,6 @@ class TaskQueue(object):
         self.wait()
       return self
 
-  def acknowledge(self, task_id):
-    if isinstance(task_id, RegisteredTask):
-      task_id = task_id.id
-
-    def cloud_delete(api):
-      api.acknowledge(task_id)
-
-    if len(self._threads):
-      self.put(cloud_delete)
-    else:
-      cloud_delete(self._api)
-
-    return self
-
-  def delete(self, task_id):
-    """Deletes a task from a TaskQueue."""
-    if isinstance(task_id, RegisteredTask):
-      task_id = task_id.id
-
-    def cloud_delete(api):
-      api.delete(task_id)
-
-    if len(self._threads):
-      self.put(cloud_delete)
-    else:
-      cloud_delete(self._api)
-
-    return self
-
   def poll(
     self, lease_seconds=LEASE_SECONDS, tag=None, 
     verbose=False, execute_args=[], execute_kwargs={}, 
@@ -251,7 +163,6 @@ class TaskQueue(object):
     Poll a queue until a stop condition is reached (default forever). Note
     that this function is not thread safe as it requires a global variable
     to intercept SIGINT.
-
     lease_seconds: each task should be leased for this many seconds
     tag: if specified, query for only tasks that match this tag
     execute_args / execute_kwargs: pass these arguments to task execution
@@ -267,7 +178,6 @@ class TaskQueue(object):
       once after every task.
     log_fn: Feed error messages to this function, default print (when verbose is enabled).
     verbose: print out the status of each step
-
     Return: number of tasks executed
     """
     global LOOP
@@ -306,7 +216,7 @@ class TaskQueue(object):
     executed = 0
 
     backoff = False
-    backoff_exceptions = tuple(list(backoff_exceptions) + [ TaskQueue.QueueEmpty ])
+    backoff_exceptions = tuple(list(backoff_exceptions) + [ QueueEmpty ])
 
     while LOOP:
       task = 'unknown' # for error message prior to leasing
@@ -343,14 +253,245 @@ class TaskQueue(object):
     while self.enqueued > 0:
       time.sleep(interval_sec)
 
+class TaskQueue(SuperTaskQueue, ThreadedQueue):
+  """
+  The standard usage is that a client calls lease to get the next available task,
+  performs that task, and then calls task.delete on that task before the lease expires.
+  If the client cannot finish the task before the lease expires,
+  and has a reasonable chance of completing the task,
+  it should call task.update before the lease expires.
+  If the client completes the task after the lease has expired,
+  it still needs to delete the task. 
+  Tasks should be designed to be idempotent to avoid errors 
+  if multiple clients complete the same task.
+  """
+  def __init__(
+    self, queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE, 
+    region=None, qurl=None, n_threads=40, project=PROJECT_NAME
+  ):
+
+    SuperTaskQueue.__init__(
+      self, queue_name, queue_server, 
+      region, qurl, n_threads, project
+    )
+    ThreadedQueue.__init__(self, n_threads) # creates self._queue
+    
+  def insert(self, task, args=[], kwargs={}):
+    """
+    Insert a task into an existing queue.
+    """
+    body = {
+      "payload": task.payload(),
+      "queueName": self._queue_name,
+      "groupByTag": True,
+      "tag": task.__class__.__name__
+    }
+
+    def cloud_insertion(api):
+      api.insert(body)
+
+    if len(self._threads):
+      self.put(cloud_insertion)
+    else:
+      cloud_insertion(self._api)
+
+    return self
+
+  def insert_all(self, tasks, delay_seconds=20):
+    bodies = [
+      {
+        "payload": task.payload(),
+        "queueName": self._queue_name,
+        "groupByTag": True,
+        "tag": task.__class__.__name__
+      } 
+
+      for task in tasks
+    ]
+      
+    def cloud_insertion(bodies):
+      self._api.insert(bodies, delay_seconds)
+
+    batch_size = 10
+    bodies = _scatter(bodies, math.ceil(float(len(tasks)) / float(batch_size)))
+    fns = [ partial(cloud_insertion, batch) for batch in bodies ]
+
+    schedule_threaded_jobs(
+      fns=fns,
+      concurrency=20,
+      progress='Inserting',
+      total=len(tasks),
+      batch_size=batch_size,
+    )
+
+  def acknowledge(self, task_id):
+    if isinstance(task_id, RegisteredTask):
+      task_id = task_id.id
+
+    def cloud_delete(api):
+      api.acknowledge(task_id)
+
+    if len(self._threads):
+      self.put(cloud_delete)
+    else:
+      cloud_delete(self._api)
+
+    return self
+
+  def delete(self, task_id):
+    """Deletes a task from a TaskQueue."""
+    if isinstance(task_id, RegisteredTask):
+      task_id = task_id.id
+
+    def cloud_delete(api):
+      api.delete(task_id)
+
+    if len(self._threads):
+      self.put(cloud_delete)
+    else:
+      cloud_delete(self._api)
+
+    return self
+
+class GreenTaskQueue(SuperTaskQueue):
+  """
+  The standard usage is that a client calls lease to get the next available task,
+  performs that task, and then calls task.delete on that task before the lease expires.
+  If the client cannot finish the task before the lease expires,
+  and has a reasonable chance of completing the task,
+  it should call task.update before the lease expires.
+
+  If the client completes the task after the lease has expired,
+  it still needs to delete the task. 
+
+  Tasks should be designed to be idempotent to avoid errors 
+  if multiple clients complete the same task.
+  """
+  def __init__(
+    self, queue_name=QUEUE_NAME, queue_server=QUEUE_TYPE, 
+    region=None, qurl=None, n_threads=40, project=PROJECT_NAME
+  ):
+    n_threads = max(n_threads, 1)
+    SuperTaskQueue.__init__(
+      self, queue_name, queue_server, 
+      region, qurl, n_threads, project
+    )
+    self._pool = gevent.pool.Pool(n_threads)
+    self.check_monkey_patch_status()
+
+
+  def check_monkey_patch_status(self):
+    import gevent.monkey
+    if not gevent.monkey.is_module_patched("socket"):
+      print(yellow("""
+    Switching ThreadedQueue to using green threads. This requires
+    monkey patching the standard library to use a cooperative 
+    non-blocking threading model.
+
+    Please place the following lines at the beginning of your
+    program:
+
+    import gevent.monkey
+    gevent.monkey.patch_all()
+        """))
+
+  def insert(self, task, args=[], kwargs={}):
+    """
+    Insert a task into an existing queue.
+    """
+    body = {
+      "payload": task.payload(),
+      "queueName": self._queue_name,
+      "groupByTag": True,
+      "tag": task.__class__.__name__
+    }
+
+    def cloud_insertion():
+      self._api.insert(body)
+
+    self._pool.spawn(cloud_insertion)
+
+    return self
+
+  def insert_all(self, tasks, delay_seconds=20):
+    bodies = [
+      {
+        "payload": task.payload(),
+        "queueName": self._queue_name,
+        "groupByTag": True,
+        "tag": task.__class__.__name__
+      } 
+
+      for task in tasks
+    ]
+      
+    def cloud_insertion(bodies):
+      self._api.insert(bodies, delay_seconds)
+
+    batch_size = 10
+    bodies = _scatter(bodies, math.ceil(float(len(tasks)) / float(batch_size)))
+    fns = [ partial(cloud_insertion, batch) for batch in bodies ]
+
+    schedule_green_jobs(
+      fns=fns,
+      concurrency=20,
+      progress='Inserting',
+      total=len(tasks),
+      batch_size=batch_size,
+    )
+
+  def status(self):
+    """
+    Gets information about the TaskQueue
+    """
+    return self._api.get(getStats=True)
+
+  def get_task(self, tid):
+    """
+    Gets the named task in the TaskQueue. 
+    tid is a unique string Google provides 
+    e.g. '7c6e81c9b7ab23f0'
+    """
+    return self._api.get(tid)
+
+  def list(self):
+    """
+    Lists all non-deleted Tasks in a TaskQueue, 
+    whether or not they are currently leased, up to a maximum of 100.
+    """
+    return [ totask(x) for x in self._api.list() ]
+
+  def acknowledge(self, task_id):
+    if isinstance(task_id, RegisteredTask):
+      task_id = task_id.id
+
+    def cloud_delete():
+      self._api.acknowledge(task_id)
+
+    self._pool.spawn(cloud_delete)
+
+    return self
+
+  def delete(self, task_id):
+    """Deletes a task from a TaskQueue."""
+    if isinstance(task_id, RegisteredTask):
+      task_id = task_id.id
+
+    def cloud_delete():
+      self._api.delete(task_id)
+
+    self._pool.spawn(cloud_delete)
+
+    return self
+
   def wait(self):
-    self._pool.wait()
+    self._pool.join()
 
   def __enter__(self):
     return self
 
   def __exit__(self, exception_type, exception_value, traceback):
-    self._pool.wait()
+    self._pool.join()
 
 class MockTaskQueue(object):
   def __init__(self, *args, **kwargs):
