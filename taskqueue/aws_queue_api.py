@@ -7,7 +7,6 @@ import botocore
 
 from .secrets import aws_credentials
 
-
 def toiter(obj):
   if isinstance(obj, types.GeneratorType):
     return obj
