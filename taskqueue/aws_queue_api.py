@@ -1,5 +1,6 @@
 import json
 import re
+import types
 
 import boto3
 import botocore
@@ -8,6 +9,9 @@ from .secrets import aws_credentials
 
 
 def toiter(obj):
+  if isinstance(obj, types.GeneratorType):
+    return obj
+
   try:
     if type(obj) is dict:
       return iter([ obj ])
@@ -60,13 +64,13 @@ class AWSTaskQueueAPI(object):
     resps = []
     batch = []
     while True:
-      batch.clear()
+      del batch[:]
       try:
         for i in range(10):
           batch.append(next(tasks))
       except StopIteration:
         pass
-
+      
       if len(batch) == 0:
         break
 

@@ -18,7 +18,7 @@ import numpy as np
 from tqdm import tqdm
 
 from cloudvolume.threaded_queue import ThreadedQueue
-from cloudvolume.lib import yellow
+from cloudvolume.lib import yellow, scatter
 
 from .aws_queue_api import AWSTaskQueueAPI
 from .registered_task import RegisteredTask, deserialize
@@ -414,8 +414,29 @@ class GreenTaskQueue(SuperTaskQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=0):
-    bodies = [
+  def insert_all(self, tasks, delay_seconds=0, total=None):
+    if total is None:
+      try:
+        total = len(tasks)
+      except TypeError:
+        pass
+     
+    batch_size = 10 
+    def genbatches(itr):
+      while True:
+        batch = []
+        try:
+          for i in range(batch_size):
+            batch.append(next(itr))
+        except StopIteration:
+          pass
+
+        if len(batch) == 0:
+          raise StopIteration
+
+        yield batch
+
+    bodies = (
       {
         "payload": task.payload(),
         "queueName": self._queue_name,
@@ -424,20 +445,18 @@ class GreenTaskQueue(SuperTaskQueue):
       } 
 
       for task in tasks
-    ]
-      
-    def cloud_insertion(bodies):
-      self._api.insert(bodies, delay_seconds)
+    )
 
-    batch_size = 10
-    bodies = _scatter(bodies, math.ceil(float(len(tasks)) / float(batch_size)))
-    fns = [ partial(cloud_insertion, batch) for batch in bodies ]
+    def cloud_insertion(batch):
+      self._api.insert(batch, delay_seconds)
+
+    fns = ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
     schedule_green_jobs(
       fns=fns,
       concurrency=20,
       progress='Inserting',
-      total=len(tasks),
+      total=total,
       batch_size=batch_size,
     )
 
