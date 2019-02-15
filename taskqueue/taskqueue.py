@@ -276,7 +276,7 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
     )
     ThreadedQueue.__init__(self, n_threads) # creates self._queue
     
-  def insert(self, task, args=[], kwargs={}, delay_seconds=20):
+  def insert(self, task, args=[], kwargs={}, delay_seconds=0):
     """
     Insert a task into an existing queue.
     """
@@ -297,7 +297,7 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=20):
+  def insert_all(self, tasks, delay_seconds=0):
     bodies = [
       {
         "payload": task.payload(),
@@ -395,7 +395,7 @@ class GreenTaskQueue(SuperTaskQueue):
     gevent.monkey.patch_all()
         """))
 
-  def insert(self, task, args=[], kwargs={}, delay_seconds=20):
+  def insert(self, task, args=[], kwargs={}, delay_seconds=0):
     """
     Insert a task into an existing queue.
     """
@@ -413,7 +413,7 @@ class GreenTaskQueue(SuperTaskQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=20):
+  def insert_all(self, tasks, delay_seconds=0):
     bodies = [
       {
         "payload": task.payload(),

@@ -54,7 +54,7 @@ class AWSTaskQueueAPI(object):
     )
     return resp['Attributes']
 
-  def insert(self, tasks, delay_seconds=20):
+  def insert(self, tasks, delay_seconds=0):
     tasks = toiter(tasks)
 
     AWS_BATCH_SIZE = 10 
