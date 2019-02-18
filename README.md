@@ -125,7 +125,7 @@ with TaskQueue('sqs-queue-name') as tq:
   tq.insert_all(tasks)
 ```
 
-Listing 3 takes advantage of SQS batch upload which allows for submitting 10 tasks at once. As the overhead for submitting a task lies mainly in HTTP/1.1 TCP/IP connection overhead, batching 10 requests results in nearly a 10x improvement in performance. However, in this case we've created all the tasks up front again in order to batch them correctly which results in the same issues as in Listing 1. 
+Listing 3 takes advantage of SQS batch upload which allows for submitting 10 tasks at once. As the overhead for submitting a task lies mainly in HTTP/1.1 TCP/IP connection overhead, batching 10 requests results in nearly a 10x improvement in performance. However, in this case we've created all the tasks up front again in order to batch them correctly which results in the same memory and latency issues as in Listing 1. 
 
 
 ```python 
@@ -179,8 +179,37 @@ Second, we pass parameters for task generation to the child proceses, not tasks.
 
 Third, as described in the narrative for Listing 5, the GreenTaskQueue has less context-switching overhead than ordinary multithreaded TaskQueue. Using GreenTaskQueue will cause each core to efficiently run independently of the others. At this point, your main bottlenecks will probably be OS/network card related (let us know if they aren't!). Multiprocessing does scale task production, but it's not 1:1 in the number of processes. The number of tasks per a process will fall with each additional core added, but each core still adds additional throughput up to about 16 cores.
 
+```python 
+# Listing 7: Exchanging Generators for Iterators
+import gevent.monkey 
+gevent.monkey.patch_all()
+from taskqueue import GreenTaskQueue 
+from concurrent.futures import ProcessPoolExecutor 
+
+class PrintTaskIterator(object):
+  def __init__(self, start, end):
+    self.start = start 
+    self.end = end 
+  def __len__(self):
+    return self.end - self.start
+  def __iter__(self):
+    for i in range(self.start, self.end):
+      yield PrintTask(i)
+
+def upload(tsks):
+  tq = GreenTaskQueue('wms-test-pull-queue-2')
+  tq.insert_all(tsks)
+
+tasks = [ PrintTaskIterator(0, 100), PrintTaskIterator(100, 200) ]
+with ProcessPoolExecutor(max_workers=2) as execute:
+  execute.map(upload, tasks)
+```
+
+If you insist on wanting to pass generators to your subprocesses, you can use iterators instead. The construction above allows us to write the generator call up front, pass only a few primatives through the pickling process, and transparently call the generator on the other side. We can even support the `len()` function which is not available for generators.
+
+
 [1] You can't pass generators in CPython but [you can pass iterators](https://stackoverflow.com/questions/1939015/singleton-python-generator-or-pickle-a-python-generator/1939493#1939493). You can pass generators if you use Pypy or Stackless Python.
 
-**--**  
-**Made with <3.**
+--   
+Made with <3.
 
