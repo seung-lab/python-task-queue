@@ -136,10 +136,11 @@ with TaskQueue('sqs-queue-name') as tq:
   tq.insert_all(tasks)
 ```
 
-In Listing 4, we've started using generators instead of lists. Generators are essentially lazy-lists that compute the next list element on demand. The definition of a generator is fast and takes constant time, so we are able to begin production of new elements nearly instantly. The elements are produced on demand and consumed instantly, resulting in a small constant memory overhead that can be typically measured in kilobytes to megabytes.  
+In Listing 4, we've started using generators instead of lists. Generators are essentially lazy-lists that compute the next list element on demand. Defining a generator is fast and takes constant time, so we are able to begin production of new elements nearly instantly. The elements are produced on demand and consumed instantly, resulting in a small constant memory overhead that can be typically measured in kilobytes to megabytes.  
 
 ```python 
 # Listing 5: 100s-1000s per second, low memory usage, near-zero latency
+
 import gevent.monkey 
 gevent.monkey.patch_all()
 from taskqueue import GreenTaskQueue 
@@ -151,10 +152,11 @@ with GreenTaskQueue('sqs-queue-name') as tq:
 
 In Listing 5, we replace TaskQueue with GreenTaskQueue. Under the hood, TaskQueue relies on Python kernel threads to achieve concurrent IO. However, on systems with mutliple cores, especially those in a virutalized or NUMA context, the OS will tend to distribute the threads fairly evenly between cores leading to high context-switching overhead. Ironically, a more powerful multicore system can lead to lower performance. To remedy this issue, we introduce a user-space cooperative threading model (green threads) using gevent (which depending on your system is uses either libev or libuv for an event loop).  
 
-This can result in substantial performance increase on some systems as typically a single core will be fully utilized with extremely low overhead. However, using cooperative threading with networked IO in Python requires monkey patching the standard library (!!). Refusing to patch the standard library will result in single threaded performance. This can introduce problems into many larger applications (we've seen problems sometimes where multiprocessing will hang and it's incompatible with ipython). However, often the task upload script can be isolated from the rest of the system and monkey patching safely performed. Because of the risk, monkey patching is not performed automatically and a warning will appear if you don't do it manually. 
+This can result in a substantial performance increase on some systems. Typically a single core will be fully utilized with extremely low overhead. However, using cooperative threading with networked IO in Python requires monkey patching the standard library (!!). Refusing to patch the standard library will result in single threaded performance. Thus, using GreenTaskQueue can introduce problems into many larger applications (we've seen problems with multiprocessing and ipython). However, often the task upload script can be isolated from the rest of the system and this allows monkey patching to be safely performed. To give users more control over when they wish to accept the risk of monkey patching, it is not performed automatically and a warning will appear with instructions for amending your program. 
 
 ```python 
 # Listing 6: 1000s-10000 per second, low memory usage, near zero latency, efficient multiprocessing
+
 import gevent.monkey 
 gevent.monkey.patch_all()
 from taskqueue import GreenTaskQueue 
@@ -177,10 +179,11 @@ First, we do not use the usual `multiprocessing` package and instead use `concur
 
 Second, we pass parameters for task generation to the child proceses, not tasks. It is not possible to pass generators from parent to child processes in CPython [1]. It is also inefficient to pass tasks directly as it requires first generating them (as in Listing 1) and then invisibly pickling and unpickling them as they are passed to the child processes. Therefore, we pass only a small number of small picklable objects that are used for constructing a task generator on the other side.   
 
-Third, as described in the narrative for Listing 5, the GreenTaskQueue has less context-switching overhead than ordinary multithreaded TaskQueue. Using GreenTaskQueue will cause each core to efficiently run independently of the others. At this point, your main bottlenecks will probably be OS/network card related (let us know if they aren't!). Multiprocessing does scale task production, but it's not 1:1 in the number of processes. The number of tasks per a process will fall with each additional core added, but each core still adds additional throughput up to about 16 cores.
+Third, as described in the narrative for Listing 5, the GreenTaskQueue has less context-switching overhead than ordinary multithreaded TaskQueue. Using GreenTaskQueue will cause each core to efficiently run independently of the others. At this point, your main bottlenecks will probably be OS/network card related (let us know if they aren't!). Multiprocessing does scale task production, but it's not 1:1 in the number of processes. The number of tasks per a process will fall with each additional core added, but each core still adds additional throughput up to some inflection point.
 
 ```python 
 # Listing 7: Exchanging Generators for Iterators
+
 import gevent.monkey 
 gevent.monkey.patch_all()
 from taskqueue import GreenTaskQueue 
