@@ -200,7 +200,7 @@ class PrintTaskIterator(object):
       yield PrintTask(i)
 
 def upload(tsks):
-  tq = GreenTaskQueue('wms-test-pull-queue-2')
+  tq = GreenTaskQueue('sqs-queue-name')
   tq.insert_all(tsks)
 
 tasks = [ PrintTaskIterator(0, 100), PrintTaskIterator(100, 200) ]
