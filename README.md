@@ -133,10 +133,12 @@ Listing 3 takes advantage of SQS batch upload which allows for submitting 10 tas
 
 tasks = ( PrintTask(i) for i in range(1000000) ) 
 with TaskQueue('sqs-queue-name') as tq:
-  tq.insert_all(tasks)
+  tq.insert_all(tasks, total=(end - start))
 ```
 
 In Listing 4, we've started using generators instead of lists. Generators are essentially lazy-lists that compute the next list element on demand. Defining a generator is fast and takes constant time, so we are able to begin production of new elements nearly instantly. The elements are produced on demand and consumed instantly, resulting in a small constant memory overhead that can be typically measured in kilobytes to megabytes.  
+
+As generators do not support the `len` operator, we manually pass in the number of items to display a progress bar.
 
 ```python 
 # Listing 5: 100s-1000s per second, low memory usage, near-zero latency
@@ -147,12 +149,12 @@ from taskqueue import GreenTaskQueue
 
 tasks = ( PrintTask(i) for i in range(1000000) ) 
 with GreenTaskQueue('sqs-queue-name') as tq:
-  tq.insert_all(tasks)
+  tq.insert_all(tasks, total=(end - start))
 ```
 
 In Listing 5, we replace TaskQueue with GreenTaskQueue. Under the hood, TaskQueue relies on Python kernel threads to achieve concurrent IO. However, on systems with mutliple cores, especially those in a virutalized or NUMA context, the OS will tend to distribute the threads fairly evenly between cores leading to high context-switching overhead. Ironically, a more powerful multicore system can lead to lower performance. To remedy this issue, we introduce a user-space cooperative threading model (green threads) using gevent (which depending on your system is uses either libev or libuv for an event loop).  
 
-This can result in a substantial performance increase on some systems. Typically a single core will be fully utilized with extremely low overhead. However, using cooperative threading with networked IO in Python requires monkey patching the standard library (!!). Refusing to patch the standard library will result in single threaded performance. Thus, using GreenTaskQueue can introduce problems into many larger applications (we've seen problems with multiprocessing and ipython). However, often the task upload script can be isolated from the rest of the system and this allows monkey patching to be safely performed. To give users more control over when they wish to accept the risk of monkey patching, it is not performed automatically and a warning will appear with instructions for amending your program. 
+This can result in a substantial performance increase on some systems. Typically a single core will be fully utilized with extremely low overhead. However, using cooperative threading with networked IO in Python requires monkey patching the standard library (!!). Refusing to patch the standard library will result in single threaded performance. Thus, using GreenTaskQueue can introduce problems into many larger applications (we've seen problems with multiprocessing and ipython). However, often the task upload script can be isolated from the rest of the system and this allows monkey patching to be safely performed. To give users more control over when they wish to accept the risk of monkey patching, it is not performed automatically and a warning will appear with instructions for amending your program.  
 
 ```python 
 # Listing 6: 1000s-10000 per second, low memory usage, near zero latency, efficient multiprocessing
@@ -166,7 +168,7 @@ def upload(args):
   start, end = args
   tasks = ( PrintTask(i) for i in range(start, end) ) 
   with GreenTaskQueue('sqs-queue-name') as tq:
-    tq.insert_all(tasks) 
+    tq.insert_all(tasks, total=(end - start)) 
 
 task_ranges = [ (0, 250000), (250000, 500000), (500000, 750000), (750000, 1000000) ]
 with ProcessPoolExecutor(max_workers=4) as pool:
