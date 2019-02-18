@@ -587,6 +587,7 @@ class LocalTaskQueue(object):
       self.queue.append(tasks)
 
   def wait(self, progress=None):
+    self._process(progress)
     return self
 
   def poll(self, *args, **kwargs):
@@ -595,15 +596,18 @@ class LocalTaskQueue(object):
   def kill_threads(self):
     return self
 
-  def __enter__(self):
-    return self
-
-  def __exit__(self, exception_type, exception_value, traceback):
-    with tqdm(total=len(self.queue), desc="Tasks") as pbar:
+  def _process(self, progress=True):
+    with tqdm(total=len(self.queue), desc="Tasks", disable=(not progress)) as pbar:
       with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
         for _ in executor.map(_task_execute, self.queue):
           pbar.update()
     self.queue = []
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exception_type, exception_value, traceback):
+    self._process()
 
 # Necessary to define here to make the 
 # function picklable
