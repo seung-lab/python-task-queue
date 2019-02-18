@@ -545,6 +545,10 @@ class MockTaskQueue(object):
     task.execute(*args, **kwargs)
     del task
 
+  def insert_all(self, tasks, delay_seconds=0, total=None):
+    for task in tasks:
+      self.insert(task)
+
   def poll(self, *args, **kwargs):
     return self
 
@@ -577,6 +581,10 @@ class LocalTaskQueue(object):
     }
 
     self.queue.append( (task, args, kwargs) )
+
+  def insert_all(self, tasks, delay_seconds=0, total=None):
+    for task in tasks:
+      self.queue.append(tasks)
 
   def wait(self, progress=None):
     return self
