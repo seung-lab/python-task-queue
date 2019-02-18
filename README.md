@@ -175,9 +175,11 @@ In Listing 6, we finally move to multiprocessing to attain the highest speeds. T
 
 First, we do not use the usual `multiprocessing` package and instead use `concurrent.futures.ProcessPoolExecutor`. If a child process dies in `multiprocessing`, the parent process will simply hang (this is by design unfortunately...). Using this alternative package, at least an exception will be thrown.  
 
-Second, we pass parameters for task generation to the child proceses, not tasks. It is not possible to pass generators from parent to child processes. It is also inefficient to pass tasks directly as it requires first generating them (as in Listing 1) and then invisibly pickling and unpickling them as they are passed to the child processes. Therefore, we pass only a small number of small picklable objects that are used for constructing a task generator on the other side.   
+Second, we pass parameters for task generation to the child proceses, not tasks. It is not possible to pass generators from parent to child processes in CPython [1]. It is also inefficient to pass tasks directly as it requires first generating them (as in Listing 1) and then invisibly pickling and unpickling them as they are passed to the child processes. Therefore, we pass only a small number of small picklable objects that are used for constructing a task generator on the other side.   
 
 Third, as described in the narrative for Listing 5, the GreenTaskQueue has less context-switching overhead than ordinary multithreaded TaskQueue. Using GreenTaskQueue will cause each core to efficiently run independently of the others. At this point, your main bottlenecks will probably be OS/network card related (let us know if they aren't!). Multiprocessing does scale task production, but it's not 1:1 in the number of processes. The number of tasks per a process will fall with each additional core added, but each core still adds additional throughput up to about 16 cores.
+
+[1] You can't pass generators in CPython but [you can pass iterators](https://stackoverflow.com/questions/1939015/singleton-python-generator-or-pickle-a-python-generator/1939493#1939493). You can pass generators if you use Pypy or Stackless Python.
 
 **--**  
 **Made with <3.**
