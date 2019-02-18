@@ -135,6 +135,10 @@ def test_local_taskqueue():
         MockTask(arg=i)
       )
 
+  with LocalTaskQueue(parallel=1, progress=False) as tq:
+    for i in range(200):
+      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+
   with LocalTaskQueue(parallel=True, progress=False) as tq:
     for i in range(200):
       tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })

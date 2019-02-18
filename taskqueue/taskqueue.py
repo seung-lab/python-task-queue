@@ -598,10 +598,16 @@ class LocalTaskQueue(object):
 
   def _process(self, progress=True):
     with tqdm(total=len(self.queue), desc="Tasks", disable=(not progress)) as pbar:
-      with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
-        for _ in executor.map(_task_execute, self.queue):
+      if self.parallel == 1:
+        while self.queue:
+          _task_execute(self.queue.pop(0))
           pbar.update()
-    self.queue = []
+      else:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
+          for _ in executor.map(_task_execute, self.queue):
+            pbar.update()
+    
+      self.queue = []
 
   def __enter__(self):
     return self
