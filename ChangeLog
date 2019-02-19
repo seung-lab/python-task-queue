@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+0.12.3
+------
+
+* fix: ensure 'serialize' objects are returned serialized
+
 0.12.2
 ------
 

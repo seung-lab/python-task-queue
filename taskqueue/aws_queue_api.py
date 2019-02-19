@@ -1,10 +1,22 @@
 import json
 import re
+import types
 
 import boto3
 import botocore
 
 from .secrets import aws_credentials
+
+def toiter(obj):
+  if isinstance(obj, types.GeneratorType):
+    return obj
+
+  try:
+    if type(obj) is dict:
+      return iter([ obj ])
+    return iter(obj)
+  except TypeError:
+    return iter([ obj ])
 
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):
@@ -43,13 +55,35 @@ class AWSTaskQueueAPI(object):
     )
     return resp['Attributes']
 
-  def insert(self, task):
-    resp = self._sqs.send_message(
-      QueueUrl=self._qurl,
-      DelaySeconds=0,
-      MessageBody=json.dumps(task),
-    )
-    return resp['MessageId']
+  def insert(self, tasks, delay_seconds=0):
+    tasks = toiter(tasks)
+
+    AWS_BATCH_SIZE = 10 
+
+    resps = []
+    batch = []
+    while True:
+      del batch[:]
+      try:
+        for i in range(10):
+          batch.append(next(tasks))
+      except StopIteration:
+        pass
+      
+      if len(batch) == 0:
+        break
+
+      resp = self._sqs.send_message_batch(
+        QueueUrl=self._qurl,
+        Entries=[ {
+          "Id": str(j),
+          "MessageBody": json.dumps(task),
+          "DelaySeconds": delay_seconds,
+        } for j, task in enumerate(batch) ],
+      )
+      resps.append(resp)
+
+    return resps
 
   def renew_lease(self, seconds):
     raise NotImplementedError() 
