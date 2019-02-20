@@ -29,6 +29,9 @@ from .secrets import (
 )
 
 def totask(task):
+  if isinstance(task, RegisteredTask):
+    return task
+
   taskobj = deserialize(task['payload'])
   taskobj._id = task['id']
   return taskobj
@@ -545,9 +548,9 @@ class MockTaskQueue(object):
     task.execute(*args, **kwargs)
     del task
 
-  def insert_all(self, tasks, delay_seconds=0, total=None):
+  def insert_all(self, tasks, args=[], kwargs={}, delay_seconds=0, total=None):
     for task in tasks:
-      self.insert(task)
+      self.insert(task, args=args, kwargs=kwargs)
 
   def poll(self, *args, **kwargs):
     return self
@@ -582,9 +585,12 @@ class LocalTaskQueue(object):
 
     self.queue.append( (task, args, kwargs) )
 
-  def insert_all(self, tasks, delay_seconds=0, total=None):
+  def insert_all(
+      self, tasks, args=[], kwargs={}, 
+      delay_seconds=0, total=None
+    ):
     for task in tasks:
-      self.queue.append(tasks)
+      self.queue.append( (task, args, kwargs) )
 
   def wait(self, progress=None):
     self._process(progress)
