@@ -534,7 +534,11 @@ class MockTaskQueue(object):
     task.execute(*args, **kwargs)
     del task
 
-  def insert_all(self, tasks, args=[], kwargs={}, delay_seconds=0, total=None):
+  def insert_all(
+    self, tasks, args=[], kwargs={}, 
+    delay_seconds=0, total=None,
+    parallel=1
+  ):
     for task in tasks:
       self.insert(task, args=args, kwargs=kwargs)
 
@@ -573,10 +577,17 @@ class LocalTaskQueue(object):
 
   def insert_all(
       self, tasks, args=[], kwargs={}, 
-      delay_seconds=0, total=None
+      delay_seconds=0, total=None,
+      parallel=None, progress=True
     ):
+
+    if parallel is None:
+      parallel = self.parallel
+
     for task in tasks:
       self.queue.append( (task, args, kwargs) )
+
+    self._process(progress)
 
   def wait(self, progress=None):
     self._process(progress)
