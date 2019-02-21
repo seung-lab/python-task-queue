@@ -11,10 +11,10 @@ import signal
 import time
 import traceback
 
-import concurrent.futures 
 import gevent.pool
 import multiprocessing as mp
 import numpy as np
+import pathos.pools
 from tqdm import tqdm
 
 from cloudvolume.threaded_queue import ThreadedQueue
@@ -407,15 +407,16 @@ class GreenTaskQueue(SuperTaskQueue):
     import gevent.monkey
     if not gevent.monkey.is_module_patched("socket"):
       print(yellow("""
-    Switching ThreadedQueue to using green threads. This requires
+    GreenTaskQueue uses green threads. This requires
     monkey patching the standard library to use a cooperative 
     non-blocking threading model.
 
     Please place the following lines at the beginning of your
-    program:
+    program. `thread=False` is there because sometimes this
+    causes hanging in multiprocessing.
 
     import gevent.monkey
-    gevent.monkey.patch_all()
+    gevent.monkey.patch_all(thread=False)
         """))
 
   def insert(self, task, args=[], kwargs={}, delay_seconds=0):
@@ -609,7 +610,7 @@ class LocalTaskQueue(object):
           _task_execute(self.queue.pop(0))
           pbar.update()
       else:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
+        with pathos.pools.ProcessPool(self.parallel) as executor:
           for _ in executor.map(_task_execute, self.queue):
             pbar.update()
     
@@ -632,38 +633,51 @@ def _task_execute(task_tuple):
 
 def _scatter(sequence, n):
   """Scatters elements of ``sequence`` into ``n`` blocks."""
-
-  output = []
   chunklen = int(math.ceil(float(len(sequence)) / float(n)))
 
-  for i in range(n):
-    output.append(
-      copy.deepcopy(sequence[i*chunklen:(i+1)*chunklen])
-    )
+  return [
+    sequence[ i*chunklen : (i+1)*chunklen ] for i in range(n)
+  ]
 
-  return output
+def soloprocess_upload(QueueClass, queue_name, tasks):
+  with QueueClass(queue_name) as tq:
+    tq.insert_all(tasks)
 
-def _upload_tasks_single_process(queue_name, tasks):
-  with TaskQueue(queue_name=queue_name, queue_server='sqs') as tq:
-    for task in tasks:
-      tq.insert(task)
+error_queue = mp.Queue()
 
-def upload(queue_name, tasks, parallel=16, progress=False):
-  if parallel == 0:
+def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
+  if parallel is True:
     parallel = mp.cpu_count()
-  elif parallel < 0:
+  elif parallel <= 0:
     raise ValueError("Parallel must be a positive number or zero (all cpus). Got: " + str(parallel))
 
-  parallel = max(1, min(parallel, mp.cpu_count()))
-
   if parallel == 1:
-    _upload_tasks_single_process(queue_name, tasks)
-  else:
-    uploadfn = partial(_upload_tasks_single_process, queue_name)
-    tasks = _scatter(tasks, parallel)
+    soloprocess_upload(QueueClass, queue_name, tasks)
+    return 
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as executor:
-      executor.map(uploadfn, tasks)
+  def capturing_soloprocess_upload(*args, **kwargs):
+    try:
+      soloprocess_upload(*args, **kwargs)
+    except Exception as err:
+      print(err)
+      error_queue.put(err)
+
+  uploadfn = partial(
+    capturing_soloprocess_upload, QueueClass, queue_name
+  )
+  tasks = _scatter(tasks, parallel)
+
+  pool = pathos.pools.ProcessPool(parallel)
+  pool.map(uploadfn, tasks)
+
+  if not error_queue.empty():
+    errors = []
+    while not error_queue.empty():
+      err = error_queue.get()
+      if err is not StopIteration:
+        errors.append(err)
+    if len(errors):
+      raise Exception(errors)
 
 
 
