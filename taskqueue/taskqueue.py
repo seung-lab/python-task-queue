@@ -38,7 +38,7 @@ def totask(task):
 
 class QueueEmpty(LookupError):
   def __init__(self):
-    super(LookupError, self).__init__('Queue Empty')
+    super(QueueEmpty, self).__init__('Queue Empty')
 
 LEASE_SECONDS = 300
 
