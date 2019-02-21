@@ -319,7 +319,7 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
           pass
 
         if len(batch) == 0:
-          raise StopIteration
+          break
 
         yield batch
 
@@ -454,7 +454,7 @@ class GreenTaskQueue(SuperTaskQueue):
           pass
 
         if len(batch) == 0:
-          raise StopIteration
+          break
 
         yield batch
 
