@@ -28,6 +28,8 @@ from .secrets import (
   AWS_DEFAULT_REGION
 )
 
+AWS_BATCH_SIZE = 10 
+
 def totask(task):
   if isinstance(task, RegisteredTask):
     return task
@@ -108,6 +110,53 @@ class SuperTaskQueue(object):
     whether or not they are currently leased, up to a maximum of 100.
     """
     return [ totask(x) for x in self._api.list() ]
+
+  def insert_all(self, tasks, delay_seconds=0, total=None, parallel=1):
+    if total is None:
+      try:
+        total = len(tasks)
+      except TypeError:
+        pass
+
+    if parallel not in (1, False):
+      multiprocess_upload(self.__class__, self.queue_name, tasks, parallel=parallel)
+    else:
+      self._insert_all(tasks, delay_seconds, total)
+
+  def _gen_insert_all_tasks(
+      self, tasks, 
+      batch_size=AWS_BATCH_SIZE, delay_seconds=0, total=None
+    ):
+     
+    def genbatches(itr):
+      while True:
+        batch = []
+        try:
+          for i in range(AWS_BATCH_SIZE):
+            batch.append(next(itr))
+        except StopIteration:
+          pass
+
+        if len(batch) == 0:
+          break
+
+        yield batch
+
+    bodies = (
+      {
+        "payload": task.payload(),
+        "queueName": self._queue_name,
+        "groupByTag": True,
+        "tag": task.__class__.__name__
+      } 
+
+      for task in tasks
+    )
+
+    def cloud_insertion(batch):
+      self._api.insert(batch, delay_seconds)
+
+    return ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
   def renew_lease(self, task, seconds):
     """Update the duration of a task lease."""
@@ -301,43 +350,11 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=0, total=None):
-    if total is None:
-      try:
-        total = len(tasks)
-      except TypeError:
-        pass
-     
-    batch_size = 10 
-    def genbatches(itr):
-      while True:
-        batch = []
-        try:
-          for i in range(batch_size):
-            batch.append(next(itr))
-        except StopIteration:
-          pass
-
-        if len(batch) == 0:
-          break
-
-        yield batch
-
-    bodies = (
-      {
-        "payload": task.payload(),
-        "queueName": self._queue_name,
-        "groupByTag": True,
-        "tag": task.__class__.__name__
-      } 
-
-      for task in tasks
+  def _insert_all(self, tasks, delay_seconds=0, total=None):
+    batch_size = AWS_BATCH_SIZE
+    fns = self._gen_insert_all_tasks(
+      tasks, batch_size, delay_seconds, total
     )
-
-    def cloud_insertion(batch):
-      self._api.insert(batch, delay_seconds)
-
-    fns = ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
     schedule_threaded_jobs(
       fns=fns,
@@ -437,43 +454,11 @@ class GreenTaskQueue(SuperTaskQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=0, total=None):
-    if total is None:
-      try:
-        total = len(tasks)
-      except TypeError:
-        pass
-     
-    batch_size = 10 
-    def genbatches(itr):
-      while True:
-        batch = []
-        try:
-          for i in range(batch_size):
-            batch.append(next(itr))
-        except StopIteration:
-          pass
-
-        if len(batch) == 0:
-          break
-
-        yield batch
-
-    bodies = (
-      {
-        "payload": task.payload(),
-        "queueName": self._queue_name,
-        "groupByTag": True,
-        "tag": task.__class__.__name__
-      } 
-
-      for task in tasks
+  def _insert_all(self, tasks, delay_seconds=0, total=None):
+    batch_size = AWS_BATCH_SIZE
+    fns = self._gen_insert_all_tasks(
+      tasks, batch_size, delay_seconds, total
     )
-
-    def cloud_insertion(batch):
-      self._api.insert(batch, delay_seconds)
-
-    fns = ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
     schedule_green_jobs(
       fns=fns,
