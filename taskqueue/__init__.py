@@ -1,7 +1,7 @@
 from .registered_task import RegisteredTask, MockTask, PrintTask
 from .taskqueue import (
   TaskQueue, GreenTaskQueue, MockTaskQueue, LocalTaskQueue, 
-  multiprocess_upload
+  multiprocess_upload, QueueEmpty, totask
 )
 from .secrets import (
   QUEUE_NAME, TEST_QUEUE_NAME, QUEUE_TYPE, 
