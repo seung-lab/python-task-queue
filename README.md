@@ -212,6 +212,35 @@ with ProcessPoolExecutor(max_workers=2) as execute:
 
 If you insist on wanting to pass generators to your subprocesses, you can use iterators instead. The construction above allows us to write the generator call up front, pass only a few primatives through the pickling process, and transparently call the generator on the other side. We can even support the `len()` function which is not available for generators.
 
+```python
+# Listing 8: Easy Multiprocessing
+
+import gevent.monkey 
+gevent.monkey.patch_all(thread=False)
+import copy
+from taskqueue import GreenTaskQueue
+
+class PrintTaskIterator(object):
+  def __init__(self, start, end):
+    self.start = start 
+    self.end = end 
+  def __getitem__(self, slc):
+    itr = copy.deepcopy(self)
+    itr.start = self.start + slc.start 
+    itr.end = self.start + slc.stop
+    return itr
+  def __len__(self):
+    return self.end - self.start
+  def __iter__(self):
+    for i in range(self.start, self.end):
+      yield PrintTask(i)
+
+tq = GreenTaskQueue('sqs-queue-name')
+tq.insert_all(PrintTaskIterator(0,200), parallel=2)
+```
+
+If you design your iterators such that the slice operator works, TaskQueue can
+automatically resection the iterator such that it can be fed to multiple processes. Notably, we don't return `PrintTaskIterator(self.start+slc.start, self.start+slc.stop)` because it triggers an endless recursion during pickling. However, the runtime copy implementation above sidesteps this issue. Internally, `PrintTaskIterator(0,200)` will be turned into `[ PrintTaskIterator(0,100), PrintTaskIterator(100,200) ]`. We also perform tracking of exceptions raised by child processes in a queue. `gevent.monkey.patch_all(thread=False)` was necessary to avoid multiprocess hanging.
 
 [1] You can't pass generators in CPython but [you can pass iterators](https://stackoverflow.com/questions/1939015/singleton-python-generator-or-pickle-a-python-generator/1939493#1939493). You can pass generators if you use Pypy or Stackless Python.
 

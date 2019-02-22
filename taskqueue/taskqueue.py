@@ -11,10 +11,10 @@ import signal
 import time
 import traceback
 
-import concurrent.futures 
 import gevent.pool
 import multiprocessing as mp
 import numpy as np
+import pathos.pools
 from tqdm import tqdm
 
 from cloudvolume.threaded_queue import ThreadedQueue
@@ -27,6 +27,8 @@ from .secrets import (
   PROJECT_NAME, QUEUE_NAME, QUEUE_TYPE,
   AWS_DEFAULT_REGION
 )
+
+AWS_BATCH_SIZE = 10 
 
 def totask(task):
   if isinstance(task, RegisteredTask):
@@ -108,6 +110,53 @@ class SuperTaskQueue(object):
     whether or not they are currently leased, up to a maximum of 100.
     """
     return [ totask(x) for x in self._api.list() ]
+
+  def insert_all(self, tasks, delay_seconds=0, total=None, parallel=1):
+    if total is None:
+      try:
+        total = len(tasks)
+      except TypeError:
+        pass
+
+    if parallel not in (1, False):
+      multiprocess_upload(self.__class__, self.queue_name, tasks, parallel=parallel)
+    else:
+      self._insert_all(tasks, delay_seconds, total)
+
+  def _gen_insert_all_tasks(
+      self, tasks, 
+      batch_size=AWS_BATCH_SIZE, delay_seconds=0, total=None
+    ):
+     
+    def genbatches(itr):
+      while True:
+        batch = []
+        try:
+          for i in range(AWS_BATCH_SIZE):
+            batch.append(next(itr))
+        except StopIteration:
+          pass
+
+        if len(batch) == 0:
+          break
+
+        yield batch
+
+    bodies = (
+      {
+        "payload": task.payload(),
+        "queueName": self._queue_name,
+        "groupByTag": True,
+        "tag": task.__class__.__name__
+      } 
+
+      for task in tasks
+    )
+
+    def cloud_insertion(batch):
+      self._api.insert(batch, delay_seconds)
+
+    return ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
   def renew_lease(self, task, seconds):
     """Update the duration of a task lease."""
@@ -301,43 +350,11 @@ class TaskQueue(SuperTaskQueue, ThreadedQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=0, total=None):
-    if total is None:
-      try:
-        total = len(tasks)
-      except TypeError:
-        pass
-     
-    batch_size = 10 
-    def genbatches(itr):
-      while True:
-        batch = []
-        try:
-          for i in range(batch_size):
-            batch.append(next(itr))
-        except StopIteration:
-          pass
-
-        if len(batch) == 0:
-          raise StopIteration
-
-        yield batch
-
-    bodies = (
-      {
-        "payload": task.payload(),
-        "queueName": self._queue_name,
-        "groupByTag": True,
-        "tag": task.__class__.__name__
-      } 
-
-      for task in tasks
+  def _insert_all(self, tasks, delay_seconds=0, total=None):
+    batch_size = AWS_BATCH_SIZE
+    fns = self._gen_insert_all_tasks(
+      tasks, batch_size, delay_seconds, total
     )
-
-    def cloud_insertion(batch):
-      self._api.insert(batch, delay_seconds)
-
-    fns = ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
     schedule_threaded_jobs(
       fns=fns,
@@ -407,15 +424,16 @@ class GreenTaskQueue(SuperTaskQueue):
     import gevent.monkey
     if not gevent.monkey.is_module_patched("socket"):
       print(yellow("""
-    Switching ThreadedQueue to using green threads. This requires
+    GreenTaskQueue uses green threads. This requires
     monkey patching the standard library to use a cooperative 
     non-blocking threading model.
 
     Please place the following lines at the beginning of your
-    program:
+    program. `thread=False` is there because sometimes this
+    causes hanging in multiprocessing.
 
     import gevent.monkey
-    gevent.monkey.patch_all()
+    gevent.monkey.patch_all(thread=False)
         """))
 
   def insert(self, task, args=[], kwargs={}, delay_seconds=0):
@@ -436,43 +454,11 @@ class GreenTaskQueue(SuperTaskQueue):
 
     return self
 
-  def insert_all(self, tasks, delay_seconds=0, total=None):
-    if total is None:
-      try:
-        total = len(tasks)
-      except TypeError:
-        pass
-     
-    batch_size = 10 
-    def genbatches(itr):
-      while True:
-        batch = []
-        try:
-          for i in range(batch_size):
-            batch.append(next(itr))
-        except StopIteration:
-          pass
-
-        if len(batch) == 0:
-          raise StopIteration
-
-        yield batch
-
-    bodies = (
-      {
-        "payload": task.payload(),
-        "queueName": self._queue_name,
-        "groupByTag": True,
-        "tag": task.__class__.__name__
-      } 
-
-      for task in tasks
+  def _insert_all(self, tasks, delay_seconds=0, total=None):
+    batch_size = AWS_BATCH_SIZE
+    fns = self._gen_insert_all_tasks(
+      tasks, batch_size, delay_seconds, total
     )
-
-    def cloud_insertion(batch):
-      self._api.insert(batch, delay_seconds)
-
-    fns = ( partial(cloud_insertion, batch) for batch in genbatches(bodies) )
 
     schedule_green_jobs(
       fns=fns,
@@ -548,7 +534,11 @@ class MockTaskQueue(object):
     task.execute(*args, **kwargs)
     del task
 
-  def insert_all(self, tasks, args=[], kwargs={}, delay_seconds=0, total=None):
+  def insert_all(
+    self, tasks, args=[], kwargs={}, 
+    delay_seconds=0, total=None,
+    parallel=1
+  ):
     for task in tasks:
       self.insert(task, args=args, kwargs=kwargs)
 
@@ -587,10 +577,17 @@ class LocalTaskQueue(object):
 
   def insert_all(
       self, tasks, args=[], kwargs={}, 
-      delay_seconds=0, total=None
+      delay_seconds=0, total=None,
+      parallel=None, progress=True
     ):
+
+    if parallel is None:
+      parallel = self.parallel
+
     for task in tasks:
       self.queue.append( (task, args, kwargs) )
+
+    self._process(progress)
 
   def wait(self, progress=None):
     self._process(progress)
@@ -609,7 +606,7 @@ class LocalTaskQueue(object):
           _task_execute(self.queue.pop(0))
           pbar.update()
       else:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=self.parallel) as executor:
+        with pathos.pools.ProcessPool(self.parallel) as executor:
           for _ in executor.map(_task_execute, self.queue):
             pbar.update()
     
@@ -632,38 +629,51 @@ def _task_execute(task_tuple):
 
 def _scatter(sequence, n):
   """Scatters elements of ``sequence`` into ``n`` blocks."""
-
-  output = []
   chunklen = int(math.ceil(float(len(sequence)) / float(n)))
 
-  for i in range(n):
-    output.append(
-      copy.deepcopy(sequence[i*chunklen:(i+1)*chunklen])
-    )
+  return [
+    sequence[ i*chunklen : (i+1)*chunklen ] for i in range(n)
+  ]
 
-  return output
+def soloprocess_upload(QueueClass, queue_name, tasks):
+  with QueueClass(queue_name) as tq:
+    tq.insert_all(tasks)
 
-def _upload_tasks_single_process(queue_name, tasks):
-  with TaskQueue(queue_name=queue_name, queue_server='sqs') as tq:
-    for task in tasks:
-      tq.insert(task)
+error_queue = mp.Queue()
 
-def upload(queue_name, tasks, parallel=16, progress=False):
-  if parallel == 0:
+def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
+  if parallel is True:
     parallel = mp.cpu_count()
-  elif parallel < 0:
+  elif parallel <= 0:
     raise ValueError("Parallel must be a positive number or zero (all cpus). Got: " + str(parallel))
 
-  parallel = max(1, min(parallel, mp.cpu_count()))
-
   if parallel == 1:
-    _upload_tasks_single_process(queue_name, tasks)
-  else:
-    uploadfn = partial(_upload_tasks_single_process, queue_name)
-    tasks = _scatter(tasks, parallel)
+    soloprocess_upload(QueueClass, queue_name, tasks)
+    return 
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as executor:
-      executor.map(uploadfn, tasks)
+  def capturing_soloprocess_upload(*args, **kwargs):
+    try:
+      soloprocess_upload(*args, **kwargs)
+    except Exception as err:
+      print(err)
+      error_queue.put(err)
+
+  uploadfn = partial(
+    capturing_soloprocess_upload, QueueClass, queue_name
+  )
+  tasks = _scatter(tasks, parallel)
+
+  pool = pathos.pools.ProcessPool(parallel)
+  pool.map(uploadfn, tasks)
+
+  if not error_queue.empty():
+    errors = []
+    while not error_queue.empty():
+      err = error_queue.get()
+      if err is not StopIteration:
+        errors.append(err)
+    if len(errors):
+      raise Exception(errors)
 
 
 

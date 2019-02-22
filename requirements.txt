@@ -1,6 +1,7 @@
 cloud-volume>=0.20.2
 gevent
 numpy>=1.13.1
+pathos
 pytest>=3.3.1
 pbr
 -e git+https://github.com/seung-lab/tqdm.git#egg=tqdm
