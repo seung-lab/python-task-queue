@@ -146,3 +146,14 @@ def test_local_taskqueue():
   with MockTaskQueue(parallel=True, progress=False) as tq:
     for i in range(200):
       tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+
+def test_parallel_insert_all():
+  import pathos_issue
+
+  global QURL
+  tq = GreenTaskQueue(QURL)
+
+  tasks = pathos_issue.crt_tasks(5, 20)
+  tq.insert_all(tasks, parallel=2)
+
+  tq.purge()
