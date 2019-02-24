@@ -663,8 +663,25 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
   )
   tasks = _scatter(tasks, parallel)
 
-  pool = pathos.pools.ProcessPool(parallel)
-  pool.map(uploadfn, tasks)
+  # This is a hack to get dill to pickle dynamically
+  # generated classes. This is an important use case
+  # for when we create iterators with generator __iter__
+  # functions on demand.
+
+  # https://github.com/uqfoundation/dill/issues/56
+
+  try:
+    task = next(item for item in tasks if item is not None)
+  except StopIteration:
+    return 
+
+  cls_module = task.__class__.__module__
+  task.__class__.__module__ = '__main__'
+
+  with pathos.pools.ProcessPool(parallel) as pool:
+    pool.map(uploadfn, tasks)
+
+  task.__class__.__module__ = cls_module
 
   if not error_queue.empty():
     errors = []
