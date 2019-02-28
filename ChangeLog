@@ -1,6 +1,32 @@
 CHANGES
 =======
 
+0.14.2
+------
+
+* chore: version 0.14.2
+* fix: support dynamic classes in multiprocessing (#16)
+
+0.14.1
+------
+
+* chore: bump version to 0.14.1
+* fix: export QueueEmpty
+
+0.14.0
+------
+
+* chore: bump version to 0.14.0
+* feat: automatic multiprocessing (#15)
+* fix: incorrect inheritance in QueueEmpty
+* fix: issues when using LocalTaskQueue with RegisteredTask objects
+
+0.13.0
+------
+
+* chore: bump version to 0.13.0
+* feat: Batched Uploads and Green Threads (#14)
+
 0.12.3
 ------
 

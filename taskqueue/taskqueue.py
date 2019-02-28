@@ -585,6 +585,10 @@ class LocalTaskQueue(object):
       parallel = self.parallel
 
     for task in tasks:
+      task = {
+        'payload': task.payload(),
+        'id': -1,
+      }
       self.queue.append( (task, args, kwargs) )
 
     self._process(progress)
