@@ -283,7 +283,7 @@ class SuperTaskQueue(object):
         executed += 1
         printv("Delete enqueued task...")
         self.delete(task)
-        printv('INFO', task , "succesfully executed in {:.1f} sec.".format(time_delta))
+        printv('INFO', task , "succesfully executed in {:.2f} sec.".format(time_delta))
         tries = 0
       except backoff_exceptions:
         backoff = True
