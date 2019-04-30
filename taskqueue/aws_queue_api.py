@@ -102,7 +102,7 @@ class AWSTaskQueueAPI(object):
         'All'
       ],
       VisibilityTimeout=visibility_timeout,
-      WaitTimeSeconds=0,
+      WaitTimeSeconds=20,
     )
         
     if 'Messages' not in resp:
