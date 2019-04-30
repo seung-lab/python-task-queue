@@ -8,4 +8,4 @@ from .secrets import (
   PROJECT_NAME, AWS_DEFAULT_REGION
 )
 
-__version__ = '0.14.3'
+__version__ = '0.14.4'
