@@ -277,11 +277,13 @@ class SuperTaskQueue(object):
         task = self.lease(seconds=int(lease_seconds))
         tries += 1
         printv(task)
+        time_start = time.time()
         task.execute(*execute_args, **execute_kwargs)
+        time_delta = time.time() - time_start
         executed += 1
         printv("Delete enqueued task...")
         self.delete(task)
-        log_fn('INFO', task , "succesfully executed")
+        printv('INFO', task , "succesfully executed in {:.2f} sec.".format(time_delta))
         tries = 0
       except backoff_exceptions:
         backoff = True
