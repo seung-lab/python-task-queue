@@ -23,7 +23,7 @@ else:
 
 QTYPES = ('aws',)#, 'google')
 
-QURL = 'https://sqs.us-east-1.amazonaws.com/098703261575/wms-test-pull-queue'
+QURL = 'test-pull-queue'
 
 class ExecutePrintTask(RegisteredTask):
   def __init__(self):
