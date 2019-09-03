@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+0.14.5
+------
+
+* release(0.14.5): fix multiprocessing progress bar
+* fix: parallel progress bar fills smoothly (#19)
+
 0.14.4
 ------
 
