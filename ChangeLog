@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+0.14.4
+------
+
+* release: 0.14.4
+* feat(poll): show elapsed time in success message (#18)
+* fix: use 20 sec wait time to avoid polling 0s on tasks for AWS
+
 0.14.3
 ------
 

@@ -613,7 +613,7 @@ class LocalTaskQueue(object):
           pbar.update()
       else:
         with pathos.pools.ProcessPool(self.parallel) as executor:
-          for _ in executor.map(_task_execute, self.queue):
+          for _ in executor.imap(_task_execute, self.queue):
             pbar.update()
     
       self.queue = []
