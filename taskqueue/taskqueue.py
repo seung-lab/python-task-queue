@@ -525,7 +525,9 @@ class GreenTaskQueue(SuperTaskQueue):
 
 class MockTaskQueue(object):
   def __init__(self, *args, **kwargs):
-    pass
+    self.progress = False 
+    if 'progress' in kwargs:
+      self.progress = bool(kwargs['progress'])
 
   def insert(self, task, args=[], kwargs={}):
     task = {
@@ -541,7 +543,7 @@ class MockTaskQueue(object):
     delay_seconds=0, total=None,
     parallel=1
   ):
-    for task in tasks:
+    for task in tqdm(tasks, disable=(not self.progress)):
       self.insert(task, args=args, kwargs=kwargs)
 
   def poll(self, *args, **kwargs):
