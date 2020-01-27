@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+0.15.0
+------
+
+* release: 0.15.0
+* feat: support progress bars for MockTaskQueue
+* fix: accomodate change to Markdown detection on pypi
+
 0.14.5
 ------
 
