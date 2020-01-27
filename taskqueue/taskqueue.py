@@ -210,7 +210,7 @@ class SuperTaskQueue(object):
     self, lease_seconds=LEASE_SECONDS, tag=None, 
     verbose=False, execute_args=[], execute_kwargs={}, 
     stop_fn=None, backoff_exceptions=[], min_backoff_window=30, 
-    max_backoff_window=120, log_fn=None
+    max_backoff_window=120, before_fn=None, after_fn=None
   ):
     """
     Poll a queue until a stop condition is reached (default forever). Note
@@ -229,7 +229,8 @@ class SuperTaskQueue(object):
     stop_fn: A boolean returning function that accepts no parameters. When
       it returns True, the task execution loop will terminate. It is evaluated
       once after every task.
-    log_fn: Feed error messages to this function, default print (when verbose is enabled).
+    before_fn: Pass task pre-execution.
+    after_fn: Pass task post-execution.
     verbose: print out the status of each step
     Return: number of tasks executed
     """
@@ -262,21 +263,21 @@ class SuperTaskQueue(object):
     prev_sigint_handler = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, sigint_handler)
 
-    if log_fn is None:
-      log_fn = printv
-
     tries = 0
     executed = 0
 
     backoff = False
     backoff_exceptions = tuple(list(backoff_exceptions) + [ QueueEmpty ])
 
+    before_fn = before_fn or (lambda x: x)
+    after_fn = after_fn or (lambda x: x)
+
     while LOOP:
       task = 'unknown' # for error message prior to leasing
       try:
         task = self.lease(seconds=int(lease_seconds))
         tries += 1
-        printv(task)
+        before_fn(task)
         time_start = time.time()
         task.execute(*execute_args, **execute_kwargs)
         time_delta = time.time() - time_start
@@ -284,12 +285,13 @@ class SuperTaskQueue(object):
         printv("Delete enqueued task...")
         self.delete(task)
         printv('INFO', task , "succesfully executed in {:.2f} sec.".format(time_delta))
+        after_fn(task)
         tries = 0
       except backoff_exceptions:
         backoff = True
       except Exception as e:
         printv('ERROR', task, "raised {}\n {}".format(e , traceback.format_exc()))
-        raise #this will restart the container in kubernetes
+        raise # this will restart the container in kubernetes
         
       if stop_fn():
         break
