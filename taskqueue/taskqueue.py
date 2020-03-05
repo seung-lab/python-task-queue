@@ -21,6 +21,7 @@ from cloudvolume.threaded_queue import ThreadedQueue
 from cloudvolume.lib import yellow, scatter
 
 from .aws_queue_api import AWSTaskQueueAPI
+from .gcp_pubsub_api import GooglePubSubAPI
 from .registered_task import RegisteredTask, deserialize
 from .scheduler import schedule_green_jobs, schedule_threaded_jobs
 from .secrets import (
@@ -59,8 +60,10 @@ class SuperTaskQueue(object):
   # This is key to making sure threading works. Don't refactor this method away.
   def _initialize_interface(self):
     server = self._queue_server.lower()
-    if server in ('pull-queue', 'google'):
-      return NotImplementedError("Google Cloud Tasks are not supported at this time.")
+    if server in ('pubsub', 'google'):
+      topic = f'projects/{self._project}/topics/{self._queue_name}'
+      subscription = f'projects/{self._project}/subscriptions/{self._queue_name}'
+      return GooglePubSubAPI(topic, subscription)
     elif server in ('sqs', 'aws'):
       qurl = self._qurl if self._qurl else self._queue_name
       region = self._region if self._region else AWS_DEFAULT_REGION
