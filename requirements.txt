@@ -1,5 +1,6 @@
 cloud-volume>=0.20.2
 gevent
+google-cloud-pubsub
 numpy>=1.13.1
 pathos
 pytest>=3.3.1
