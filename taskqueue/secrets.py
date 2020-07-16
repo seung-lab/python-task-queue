@@ -3,7 +3,7 @@ from __future__ import print_function
 import os
 import json
 
-from cloudvolume.lib import mkdir, colorize
+from .lib import mkdir, colorize
 from cloudvolume.secrets import (
   CLOUD_VOLUME_DIR, PROJECT_NAME, 
   aws_credentials, aws_credentials_path, 

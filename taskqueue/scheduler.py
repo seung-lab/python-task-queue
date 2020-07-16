@@ -6,7 +6,7 @@ import gevent.pool
 import gevent.monkey
 from tqdm import tqdm
 
-from cloudvolume.lib import yellow
+from .lib import yellow
 
 def schedule_threaded_jobs(
     fns, concurrency=40, 

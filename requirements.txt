@@ -4,5 +4,6 @@ numpy>=1.13.1
 pathos
 pytest>=3.3.1
 pbr
+tenacity
 tqdm
 requests>2,<3

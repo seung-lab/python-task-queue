@@ -5,18 +5,8 @@ import types
 import boto3
 import botocore
 
+from .lib import toiter
 from .secrets import aws_credentials
-
-def toiter(obj):
-  if isinstance(obj, types.GeneratorType):
-    return obj
-
-  try:
-    if type(obj) is dict:
-      return iter([ obj ])
-    return iter(obj)
-  except TypeError:
-    return iter([ obj ])
 
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):

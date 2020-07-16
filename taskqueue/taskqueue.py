@@ -18,7 +18,7 @@ import pathos.pools
 from tqdm import tqdm
 
 from cloudvolume.threaded_queue import ThreadedQueue
-from cloudvolume.lib import yellow, scatter
+from .lib import yellow, scatter
 
 from .aws_queue_api import AWSTaskQueueAPI
 from .registered_task import RegisteredTask, deserialize
