@@ -17,7 +17,7 @@ import numpy as np
 import pathos.pools
 from tqdm import tqdm
 
-from cloudvolume.threaded_queue import ThreadedQueue
+from .threaded_queue import ThreadedQueue
 from .lib import yellow, scatter
 
 from .aws_queue_api import AWSTaskQueueAPI

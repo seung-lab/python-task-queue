@@ -1,4 +1,5 @@
 import fcntl
+import itertools
 import json
 import os.path
 import re
@@ -8,7 +9,7 @@ import time
 
 import tenacity
 
-from .lib import mkdir, jsonify, toiter, STRING_TYPES
+from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip
 
 retry = tenacity.retry(
   reraise=True, 
@@ -33,6 +34,41 @@ def touch_file(path):
 @retry
 def move_file(src_path, dest_path):
   os.rename(src_path, dest_path)
+
+def lock_file(fd):
+  """
+  Locks are bound to processes. A terminated process unlocks. 
+  Non-blocking, raises OSError if unable to obtain a lock.
+
+  Note that any closing of a file descriptor for the locked file
+  will release locks for all fds. This means you must open the file
+  and reuse that FD from start to finish.
+  """
+  fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+  return fd
+
+def unlock_file(fd):
+  fcntl.lockf(fd, fcntl.LOCK_UN)
+  return fd
+
+def get_id(task):
+  if isinstance(task, STRING_TYPES):
+    ident = task
+  else:
+    try:
+      ident = task._id
+    except AttributeError:
+      ident = task['id']
+  return ident
+
+def set_timestamp(filename, timestamp):
+  old_timestamp, rest = filename.split('--')
+  return "{}--{}".format(timestamp, rest)
+
+def add_seconds(filename, seconds):
+  timestamp, rest = filename.split('--')
+  timestamp = int(timestamp) + int(seconds)
+  return "{}--{}".format(timestamp, rest)
 
 class FileQueue(object):
   """
@@ -83,8 +119,7 @@ class FileQueue(object):
 
   @property
   def enqueued(self):
-    status = self.status()
-    return int(status['ApproximateNumberOfMessages']) + int(status['ApproximateNumberOfMessagesNotVisible'])
+    return int(self.list())
 
   def status(self):
     resp = self._sqs.get_queue_attributes(
@@ -111,11 +146,53 @@ class FileQueue(object):
         os.path.join(self.movement_path, str(identifier))
       )
 
-  def renew_lease(self, seconds):
-    raise NotImplementedError() 
+  def renew_lease(self, task, seconds):
+    ident = get_id(task)
+    movement_path = os.path.join(self.movement_path, ident)
 
-  def cancel_lease(self, rhandle):
+    fd = lock_file(open(movements_path, 'rwt'))
+    contents = fd.read()
+
+    for filename in reversed(contents.split('\n')):
+      if filename == '':
+        continue
+
+      old_path = os.path.join(self.queue_path, filename)
+      new_filename = add_seconds(filename, seconds)
+      new_path = os.path.join(self.queue_path, new_filename)
+      try:
+        move_file(old_path, new_path)
+      except FileNotFoundError:
+        continue
+
+      try:
+        fd.write(contents + new_filename + '\n')
+      except:
+        move_file(new_path, old_path)
+        fd.close()
+        raise
+
+      break
+
+    fd.close() # releases POSIX lock
+
+  def cancel_lease(self, task):
     raise NotImplementedError()
+
+  def make_all_available(self):
+    """Voids leases and sets all tasks to available."""
+    now = int(time.time())
+    for file in os.scandir(self.movement_path):
+      try:
+        os.remove(os.path.join(file.path, file.name))
+      except FileNotFoundError:
+        pass   
+
+    for file in os.scandir(self.queue_path):
+      move_file(
+        os.path.join(self.queue_path, file.name),
+        os.path.join(self.queue_path, set_timestamp(file.name, now))
+      )
 
   def _lease_filename(self, filename):
     timestamp, rest = filename.split('--')
@@ -123,14 +200,21 @@ class FileQueue(object):
     new_filename = "{}--{}".format(now + seconds, rest)
     new_filepath = os.path.join(self.queue_path, new_filename)
 
+    movements_filename = rest.split('.')[0] # uuid
+    movement_path = os.path.join(self.movement_path, movements_filename)
+
+    fd = open(movements_path, 'at')
+    lock_file(fd)
+
     move_file(
       os.path.join(self.queue_path, filename), 
       new_filepath
     )
 
-    movements_filename = rest.split('.')[0] # uuid
-    movement_path = os.path.join(self.movement_path, movements_filename)
-    write_file(movements_path, str(filename) + '\n', mode='at')
+    fd.write(str(filename) + '\n')
+
+    fd.flush()
+    fd.close() # unlocks POSIX advisory file lock
 
     task = json.loads(read_file(new_filepath))
     task['id'] = movements_filename
@@ -161,16 +245,13 @@ class FileQueue(object):
     return self.delete(task)
 
   def delete(self, task):
-    if isinstance(task, STRING_TYPES):
-      ident = task
-    else:
-      try:
-        ident = task._id
-      except AttributeError:
-        ident = task['id']
+    ident = get_id(task)
 
-    movements_filename = os.path.join(self.movement_path, ident)
-    filenames = read_file(movements_filename).split('\n')
+    movements_file_path = os.path.join(self.movement_path, ident)
+    fd = open(movements_file_path, 'rt')
+    lock_file(fd)
+
+    filenames = fd.read().split('\n')
 
     for filename in filenames:
       if filename == '':
@@ -181,23 +262,32 @@ class FileQueue(object):
       except FileNotFoundError:
         pass
 
-    os.remove(movements_filename)
+    fd.close()
+    os.remove(movements_file_path)
 
   def purge(self):
-    # This is more efficient, but it kept freezing
-    # try:
-    #     self._sqs.purge_queue(QueueUrl=self._qurl)
-    # except botocore.errorfactory.PurgeQueueInProgress:
+    all_files = itertools.chain(
+      os.scandir(self.queue_path), 
+      os.scandir(self.movement_path)
+    )
+    for file in all_files:
+      try:
+        os.remove(os.path.join(file.path, file.name))
+      except FileNotFoundError:
+        pass
 
-    while self.enqueued:
-      # visibility_timeout must be > 0 for delete to work
-      tasks = self._request(num_tasks=10, visibility_timeout=10)
-      for task in tasks:
-        self.delete(task)
-    return self
+  def is_empty(self):
+    try:
+      first(iter(self))
+      return False
+    except StopIteration:
+      return True
 
-  def list(self):
-    return ( f.name for f in os.scandir(self.movement_path) )
+  def __iter__(self):
+    return ( f.name for f in os.scandir(self.queue_path) )
+
+  def __len__(self):
+    return itertools.count(iter(self))
       
       
 
