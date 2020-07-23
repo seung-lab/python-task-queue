@@ -6,24 +6,16 @@ from six.moves import range
 import pytest
 
 import taskqueue
-from taskqueue import RegisteredTask, GreenTaskQueue, TaskQueue, MockTask, PrintTask, LocalTaskQueue, MockTaskQueue
-from taskqueue import QUEUE_NAME
+from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 
 TRAVIS_BRANCH = None if 'TRAVIS_BRANCH' not in os.environ else os.environ['TRAVIS_BRANCH']
 
-if QUEUE_NAME != '':
-  pass
-elif TRAVIS_BRANCH is None:
-  QUEUE_NAME = 'test-pull-queue'
+if TRAVIS_BRANCH is None:
+  QURL = 'sqs://test-pull-queue'
 elif TRAVIS_BRANCH == 'master':
-  QUEUE_NAME = 'travis-pull-queue-1'
+  QURL = 'sqs://travis-pull-queue-1'
 else:
-  QUEUE_NAME = 'travis-pull-queue-2'
-
-
-QTYPES = ('aws',)#, 'google')
-
-QURL = 'test-pull-queue'
+  QURL = 'sqs://travis-pull-queue-2'
 
 class ExecutePrintTask(RegisteredTask):
   def __init__(self):
@@ -32,7 +24,6 @@ class ExecutePrintTask(RegisteredTask):
   def execute(self, wow, wow2):
     print(wow + wow2)
     return wow + wow2
-
 
 def test_task_creation():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
@@ -51,55 +42,38 @@ def test_task_creation():
   }
 
 def test_get():
-  global QUEUE_NAME
+  global QURL
 
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      tq = QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
+  tq = TaskQueue(QURL, n_threads=0)
 
-      n_inserts = 5
-      tq.purge()
-      for _ in range(n_inserts):
-        task = PrintTask()
-        tq.insert(task)
-      tq.wait()
-      tq.purge()
+  n_inserts = 5
+  tq.purge()
+  tq.insert(( PrintTask() for _ in range(n_inserts) ))
+  tq.purge()
 
 def test_single_threaded_insertion():
-  global QUEUE_NAME
+  global QURL
 
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      tq = QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
+  tq = TaskQueue(QURL, n_threads=0)
 
-      tq.purge()
-      
-      n_inserts = 5
-      for _ in range(n_inserts):
-        task = PrintTask()
-        tq.insert(task)
-      tq.wait()
+  tq.purge()
+  
+  n_inserts = 5
+  tq.insert(( PrintTask() for i in range(n_inserts) ))
 
-      assert all(map(lambda x: type(x) == PrintTask, tq.list()))
+  assert all(map(lambda x: type(x) == PrintTask, tq.list()))
 
-      tq.purge()
+  tq.purge()
 
-def test_multi_threaded_insertion():
-  global QUEUE_NAME
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      tq = QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
+@pytest.mark.parametrize('green', (True, False))
+def test_multi_threaded_insertion(green):
+  global QURL
+  tq = TaskQueue(QURL, n_threads=10, green=green)
 
-      n_inserts = 10
-      tq.purge()
-      tq.wait()
-     
-      for _ in range(n_inserts):
-        task = PrintTask()
-        tq.insert(task)
-      tq.wait()
-
-      tq.purge()
+  n_inserts = 10
+  tq.purge()
+  tq.insert(( PrintTask() for i in range(n_inserts)))
+  tq.purge()
 
 # def test_multiprocess_upload():
 #   global QURL
@@ -122,40 +96,32 @@ def test_multi_threaded_insertion():
 #       tq.purge()
 
 def test_400_errors():
-  global QUEUE_NAME
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      with QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL) as tq:
-        tq.delete('nonexistent')
+  global QURL
+  tq = TaskQueue(QURL, n_threads=0)
+  tq.delete('nonexistent')
 
 def test_local_taskqueue():
-  with LocalTaskQueue(parallel=True, progress=False) as tq:
-    for i in range(20000):
-      tq.insert(
-        MockTask(arg=i)
-      )
+  tq = LocalTaskQueue(parallel=True, progress=False)
+  tasks = ( MockTask(arg=i) for i in range(20000) )
+  tq.insert(tasks)
 
-  with LocalTaskQueue(parallel=1, progress=False) as tq:
-    for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+  tq = LocalTaskQueue(parallel=1, progress=False)
+  tasks = ( ExecutePrintTask() for i in range(200) )
+  tq.insert(tasks, args=[i], kwargs={ 'wow2': 4 })
 
-  with LocalTaskQueue(parallel=True, progress=False) as tq:
-    for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+  tq = LocalTaskQueue(parallel=True, progress=False)
+  tasks = ( ExecutePrintTask() for i in range(200) )
+  tq.insert(tasks, args=[i], kwargs={ 'wow2': 4 })
 
-  with LocalTaskQueue(parallel=True, progress=False) as tq:
-    epts = [ PrintTask(i) for i in range(200) ]
-    tq.insert_all(epts)
-
-  with MockTaskQueue(parallel=True, progress=False) as tq:
-    for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+  tq = LocalTaskQueue(parallel=True, progress=False)
+  epts = [ PrintTask(i) for i in range(200) ]
+  tq.insert(epts)
 
 def test_parallel_insert_all():
   import pathos_issue
 
   global QURL
-  tq = GreenTaskQueue(QURL)
+  tq = TaskQueue(QURL, green=True)
 
   tasks = pathos_issue.crt_tasks(5, 20)
   tq.insert_all(tasks, parallel=2)

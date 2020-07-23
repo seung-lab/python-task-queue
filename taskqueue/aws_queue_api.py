@@ -3,7 +3,7 @@ import re
 import types
 
 import boto3
-import botocore
+import botocore.errorfactory
 
 from .lib import toiter
 from .secrets import aws_credentials
@@ -31,7 +31,11 @@ class AWSTaskQueueAPI(object):
     )    
 
     if self._qurl is None:
-      self._qurl = self._sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
+      try:
+        self._qurl = self._sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
+      except Exception:
+        print(qurl)
+        raise
 
   @property
   def enqueued(self):
@@ -109,9 +113,6 @@ class AWSTaskQueueAPI(object):
     if numTasks > 1:
       raise ValueError("This library (not boto/SQS) only supports fetching one task at a time. Requested: {}.".format(numTasks))
     return self._request(numTasks, seconds)
-
-  def acknowledge(self, task):
-    return self.delete(task)
 
   def delete(self, task):
     if type(task) == str:

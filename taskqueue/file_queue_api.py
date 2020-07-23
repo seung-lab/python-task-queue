@@ -65,7 +65,7 @@ def set_timestamp(filename, timestamp):
   old_timestamp, rest = filename.split('--')
   return "{}--{}".format(timestamp, rest)
 
-def add_seconds(filename, seconds):
+def add_seconds_to_timestamp(filename, seconds):
   timestamp, rest = filename.split('--')
   timestamp = int(timestamp) + int(seconds)
   return "{}--{}".format(timestamp, rest)
@@ -158,7 +158,7 @@ class FileQueue(object):
         continue
 
       old_path = os.path.join(self.queue_path, filename)
-      new_filename = add_seconds(filename, seconds)
+      new_filename = add_seconds_to_timestamp(filename, seconds)
       new_path = os.path.join(self.queue_path, new_filename)
       try:
         move_file(old_path, new_path)

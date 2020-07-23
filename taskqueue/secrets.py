@@ -12,6 +12,8 @@ HOME = os.path.expanduser('~')
 CLOUD_VOLUME_DIR = mkdir(os.path.join(HOME, '.cloudvolume', 'secrets'))
 CLOUD_FILES_DIR = mkdir(os.path.join(HOME, '.cloudfiles', 'secrets'))
 
+AWS_DEFAULT_REGION = 'us-east-1' if 'AWS_DEFAULT_REGION' not in os.environ else os.environ['AWS_DEFAULT_REGION']
+
 def secretpath(filepath):
   preferred = os.path.join(CLOUD_VOLUME_DIR, filepath)
   
