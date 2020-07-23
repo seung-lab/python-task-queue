@@ -21,7 +21,7 @@ from .threaded_queue import ThreadedQueue
 from .lib import yellow, scatter, sip, toiter
 
 from .aws_queue_api import AWSTaskQueueAPI
-from .paths import extract_path
+from .paths import extract_path, mkpath
 from .registered_task import RegisteredTask, deserialize
 from .scheduler import schedule_jobs
 from .secrets import (
@@ -37,6 +37,11 @@ def totask(task):
   taskobj = deserialize(task['payload'])
   taskobj._id = task['id']
   return taskobj
+
+def totaskid(taskid):
+  if isinstance(taskid, RegisteredTask):
+    return taskid.id
+  return taskid
 
 def totalfn(iterator, total):
   if total is not None:
@@ -102,27 +107,6 @@ class TaskQueue(object):
     gevent.monkey.patch_all(thread=False)
         """))
 
-  def insert(self, task, args=[], kwargs={}, delay_seconds=0):
-    """
-    Insert a task into an existing queue.
-    """
-    body = {
-      "payload": task.payload(),
-      "queueName": self.path.path,
-      "groupByTag": True,
-      "tag": task.__class__.__name__
-    }
-
-    def cloud_insertion(api):
-      self.api.insert(body, delay_seconds)
-
-    if len(self._threads):
-      self.put(cloud_insertion)
-    else:
-      cloud_insertion(self._api)
-
-    return self
-
   @property
   def enqueued(self):
     """
@@ -135,13 +119,13 @@ class TaskQueue(object):
     
     Returns: (int) number of tasks in cloud queue
     """
-    return self._api.enqueued
+    return self.api.enqueued
 
   # def status(self):
   #   """
   #   Gets information about the TaskQueue
   #   """
-  #   return self._api.get(getStats=True)
+  #   return self.api.get(getStats=True)
 
   def list(self):
     """
@@ -149,25 +133,30 @@ class TaskQueue(object):
     whether or not they are currently leased, 
     up to a maximum of 100.
     """
-    return [ totask(x) for x in self._api.list() ]
+    return [ totask(x) for x in self.api.list() ]
 
   def insert(self, tasks, delay_seconds=0, total=None, parallel=1):
     total = totalfn(tasks, total)
 
     if parallel not in (1, False) and total is not None and total > 1:
-      multiprocess_upload(self.__class__, self.path.path, tasks, parallel=parallel)
+      multiprocess_upload(self.__class__, mkpath(self.path), tasks, parallel=parallel)
       return
+
+    batch_size = AWS_DEFAULT_REGION
     
     schedule_jobs(
       fns=self._gen_insert_all_tasks(
-        tasks, AWS_BATCH_SIZE, delay_seconds, total
+        tasks, batch_size, delay_seconds, total
       ),
       concurrency=self.n_threads,
       progress='Inserting',
       total=total,
-      batch_size=batch_size,
       green=self.green,
     )
+
+  def insert_all(self, *args, **kwargs):
+    """For backwards compatibility."""
+    return self.insert(*args, **kwargs)
 
   def _gen_insert_all_tasks(
       self, tasks, 
@@ -178,7 +167,7 @@ class TaskQueue(object):
     bodies = (
       {
         "payload": task.payload(),
-        "queueName": self._queue_name,
+        "queueName": self.path.path,
         "groupByTag": True,
         "tag": task.__class__.__name__
       } 
@@ -186,14 +175,14 @@ class TaskQueue(object):
       for task in tasks
     )
 
-    return ( self._api.insert(batch, delay_seconds) for batch in sip(bodies, AWS_BATCH_SIZE) )
+    return ( partial(self.api.insert, batch, delay_seconds) for batch in sip(bodies, AWS_BATCH_SIZE) )
 
   def renew(self, task, seconds):
     """Update the duration of a task lease."""
-    return self._api.renew_lease(task, seconds)
+    return self.api.renew_lease(task, seconds)
 
   def cancel(self, task):
-    return self._api.cancel_lease(task)
+    return self.api.cancel_lease(task)
 
   def lease(self, seconds=600, num_tasks=1, tag=None):
     """
@@ -201,7 +190,7 @@ class TaskQueue(object):
     Required query parameters: leaseSecs, numTasks
     """
     tag = tag if tag else None
-    tasks = self._api.lease(
+    tasks = self.api.lease(
       numTasks=num_tasks, 
       seconds=seconds,
       groupByTag=(tag is not None),
@@ -219,23 +208,21 @@ class TaskQueue(object):
     task_id = toiter(task_id)
     total = totalfn(task_id, total)
 
-    def deltask(task):
-      task = totask(task)
-      self.api.delete(task.id)
+    def deltask(tid):
+      self.api.delete(totaskid(tid))
 
     schedule_jobs(
-      fns=( deltask(task) for task in task_id ),
+      fns=( partial(deltask, tid) for tid in task_id ),
       concurrency=self.n_threads,
       progress=('Deleting' if self.progress else None),
       total=total,
-      batch_size=AWS_BATCH_SIZE,
       green=self.green,
     )
 
   def purge(self):
     """Deletes all tasks in the queue."""
     try:
-      return self._api.purge()
+      return self.api.purge()
     except AttributeError:
       while True:
         lst = self.list()
@@ -362,27 +349,35 @@ class LocalTaskQueue(object):
     self.progress = progress
 
   def insert(
-      self, tasks, args=[], kwargs={}, 
+      self, tasks, 
       delay_seconds=0, total=None,
       parallel=None, progress=True
     ):
     for task in tasks:
+      args, kwargs = [], {}
+      if isinstance(task, tuple):
+        task, args, kwargs = task
       task = {
         'payload': task.payload(),
         'id': -1,
       }
       self.queue.append( (task, args, kwargs) )
 
-    self.execute(progress)
+    self.execute(progress, parallel, total)
+
+  def insert_all(self, *args, **kwargs):
+    return self.insert(*args, **kwargs)
 
   def poll(self, *args, **kwargs):
     pass
 
-  def execute(self, progress=True, parallel=None):
+  def execute(self, progress=True, parallel=None, total=None):
     if parallel is None:
       parallel = self.parallel
 
-    with tqdm(total=len(self.queue), desc="Tasks", disable=(not progress)) as pbar:
+    total = totalfn(self.queue, total)
+
+    with tqdm(total=total, desc="Tasks", disable=(not progress)) as pbar:
       if self.parallel == 1:
         while self.queue:
           _task_execute(self.queue.pop(0))
@@ -415,8 +410,8 @@ def _scatter(sequence, n):
   ]
 
 def soloprocess_upload(QueueClass, queue_name, tasks):
-  with QueueClass(queue_name) as tq:
-    tq.insert_all(tasks)
+  tq = QueueClass(queue_name)
+  tq.insert(tasks)
 
 error_queue = mp.Queue()
 

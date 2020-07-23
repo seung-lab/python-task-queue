@@ -5,7 +5,7 @@ import types
 import boto3
 import botocore.errorfactory
 
-from .lib import toiter
+from .lib import toiter, sip
 from .secrets import aws_credentials
 
 class AWSTaskQueueAPI(object):
@@ -56,14 +56,8 @@ class AWSTaskQueueAPI(object):
 
     resps = []
     batch = []
-    while True:
-      del batch[:]
-      try:
-        for i in range(10):
-          batch.append(next(tasks))
-      except StopIteration:
-        pass
-      
+
+    for batch in sip(tasks, AWS_BATCH_SIZE):
       if len(batch) == 0:
         break
 

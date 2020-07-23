@@ -12,6 +12,9 @@ ExtractedPath = namedtuple('ExtractedPath',
 
 ALLOWED_PROTOCOLS = [ 'sqs', 'fq', 'mem' ]
 
+def mkpath(extracted_path):
+  return extracted_path.protocol + "://" + extracted_path.path
+
 def pop_protocol(cloudpath):
   protocol_re = re.compile(r'(\w+)://')
 

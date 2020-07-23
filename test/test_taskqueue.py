@@ -106,12 +106,12 @@ def test_local_taskqueue():
   tq.insert(tasks)
 
   tq = LocalTaskQueue(parallel=1, progress=False)
-  tasks = ( ExecutePrintTask() for i in range(200) )
-  tq.insert(tasks, args=[i], kwargs={ 'wow2': 4 })
+  tasks = ( (ExecutePrintTask(), [i], { 'wow2': 4 }) for i in range(200) )
+  tq.insert(tasks)
 
   tq = LocalTaskQueue(parallel=True, progress=False)
-  tasks = ( ExecutePrintTask() for i in range(200) )
-  tq.insert(tasks, args=[i], kwargs={ 'wow2': 4 })
+  tasks = ( (ExecutePrintTask(), [i], { 'wow2': 4 }) for i in range(200) )
+  tq.insert(tasks)
 
   tq = LocalTaskQueue(parallel=True, progress=False)
   epts = [ PrintTask(i) for i in range(200) ]
@@ -124,6 +124,6 @@ def test_parallel_insert_all():
   tq = TaskQueue(QURL, green=True)
 
   tasks = pathos_issue.crt_tasks(5, 20)
-  tq.insert_all(tasks, parallel=2)
+  tq.insert(tasks, parallel=2)
 
   tq.purge()
