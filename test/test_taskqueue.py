@@ -66,11 +66,12 @@ def test_single_threaded_insertion():
   tq.purge()
 
 @pytest.mark.parametrize('green', (True, False))
-def test_multi_threaded_insertion(green):
+@pytest.mark.parametrize('threads', (1, 2, 10, 20, 40))
+def test_multi_threaded_insertion(green, threads):
   global QURL
-  tq = TaskQueue(QURL, n_threads=10, green=green)
+  tq = TaskQueue(QURL, n_threads=threads, green=green)
 
-  n_inserts = 10
+  n_inserts = 40
   tq.purge()
   tq.insert(( PrintTask() for i in range(n_inserts)))
   tq.purge()
