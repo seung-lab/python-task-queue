@@ -21,6 +21,7 @@ from .threaded_queue import ThreadedQueue
 from .lib import yellow, scatter, sip, toiter
 
 from .aws_queue_api import AWSTaskQueueAPI
+from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
 from .registered_task import RegisteredTask, deserialize
 from .scheduler import schedule_jobs
@@ -87,8 +88,8 @@ class TaskQueue(object):
   def initialize_api(self, path, kwargs):
     if path.protocol == 'sqs':
       return AWSTaskQueueAPI(qurl=path.path, region_name=kwargs.get('region', AWS_DEFAULT_REGION))
-    # elif path.protocol == 'fq':
-    #   return FileQueueAPI(...)
+    elif path.protocol == 'fq':
+      return FileQueueAPI(path.path)
     else:
       raise ValueError('Unsupported protocol ' + str(self.path.protocol))
 
@@ -184,24 +185,25 @@ class TaskQueue(object):
   def cancel(self, task):
     return self.api.cancel_lease(task)
 
-  def lease(self, seconds=600, num_tasks=1, tag=None):
+  def lease(self, seconds=600, num_tasks=1):
     """
     Acquires a lease on the topmost N unowned tasks in the specified queue.
     Required query parameters: leaseSecs, numTasks
     """
-    tag = tag if tag else None
-    tasks = self.api.lease(
-      numTasks=num_tasks, 
-      seconds=seconds,
-      groupByTag=(tag is not None),
-      tag=tag,
-    )
+    if num_tasks <= 0:
+      raise ValueError("num_tasks must be > 0. Got: " + str(num_tasks))
+    if seconds < 0:
+      raise ValueError("lease seconds must be >= 0. Got: " + str(seconds))
+
+    tasks = self.api.lease(seconds, num_tasks)
 
     if not len(tasks):
       raise QueueEmptyError()
 
-    task = tasks[0]
-    return totask(task)
+    if num_tasks == 1:
+      return totask(tasks[0])
+    else:
+      return [ totask(task) for task in tasks ]
 
   def delete(self, task_id, total=None):
     """Deletes a task from a TaskQueue."""
@@ -391,6 +393,11 @@ class LocalTaskQueue(object):
 
 class MockTaskQueue(LocalTaskQueue):
   pass
+
+class GreenTaskQueue(TaskQueue):
+  def __init__(self, *args, **kwargs):
+    kwargs['green'] = True
+    super(TaskQueue, self).__init__(*args, **kwargs)
 
 # Necessary to define here to make the 
 # function picklable

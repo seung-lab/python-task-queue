@@ -7,15 +7,16 @@ import pytest
 
 import taskqueue
 from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
+from taskqueue.paths import ExtractedPath, mkpath
 
 TRAVIS_BRANCH = None if 'TRAVIS_BRANCH' not in os.environ else os.environ['TRAVIS_BRANCH']
 
 if TRAVIS_BRANCH is None:
-  QURL = 'sqs://test-pull-queue'
+  QURL = 'test-pull-queue'
 elif TRAVIS_BRANCH == 'master':
-  QURL = 'sqs://travis-pull-queue-1'
+  QURL = 'travis-pull-queue-1'
 else:
-  QURL = 'sqs://travis-pull-queue-2'
+  QURL = 'travis-pull-queue-2'
 
 class ExecutePrintTask(RegisteredTask):
   def __init__(self):
@@ -41,15 +42,26 @@ def test_task_creation():
       "with_kwargs": None
   }
 
-def test_get():
+@pytest.mark.parametrize('protocol', ('fq',))
+def test_get(protocol):
   global QURL
 
-  tq = TaskQueue(QURL, n_threads=0)
+  if protocol == 'fq':
+    qurl = '/tmp/removeme/taskqueue/fq'
+  else:
+    qurl = QURL
+
+  path = mkpath(ExtractedPath(protocol, qurl))
+
+  tq = TaskQueue(path, n_threads=0)
 
   n_inserts = 5
   tq.purge()
   tq.insert(( PrintTask() for _ in range(n_inserts) ))
-  tq.purge()
+  
+  for i in range(n_inserts):
+    t = tq.lease()
+    tq.delete(t)
 
 def test_single_threaded_insertion():
   global QURL

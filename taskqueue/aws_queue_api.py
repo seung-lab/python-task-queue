@@ -103,10 +103,10 @@ class AWSTaskQueueAPI(object):
       tasks.append(task)
     return tasks
 
-  def lease(self, seconds, numTasks=1, groupByTag=False, tag=''):
-    if numTasks > 1:
-      raise ValueError("This library (not boto/SQS) only supports fetching one task at a time. Requested: {}.".format(numTasks))
-    return self._request(numTasks, seconds)
+  def lease(self, seconds, num_tasks=1):
+    if num_tasks > 1:
+      raise ValueError("This library (not boto/SQS) only supports fetching one task at a time. Requested: {}.".format(num_tasks))
+    return self._request(num_tasks, seconds)
 
   def delete(self, task):
     if type(task) == str:

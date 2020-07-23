@@ -44,7 +44,7 @@ def lock_file(fd):
   will release locks for all fds. This means you must open the file
   and reuse that FD from start to finish.
   """
-  fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+  fcntl.lockf(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
   return fd
 
 def unlock_file(fd):
@@ -70,7 +70,7 @@ def add_seconds_to_timestamp(filename, seconds):
   timestamp = int(timestamp) + int(seconds)
   return "{}--{}".format(timestamp, rest)
 
-class FileQueue(object):
+class FileQueueAPI(object):
   """
   University clusters and supercomputers often cannot access SQS easily 
   but have access to a common file system. It would be a pain to have t
@@ -110,9 +110,6 @@ class FileQueue(object):
   """
   def __init__(self, path):
     self.path = path
-
-    if os.path.exists(path):
-      raise ValueError("This queue or a similarly named directory already exists: " + str(path))
 
     self.movement_path = mkdir(os.path.join(path, 'movement'))
     self.queue_path = mkdir(os.path.join(path, 'queue'))
@@ -184,7 +181,7 @@ class FileQueue(object):
     now = int(time.time())
     for file in os.scandir(self.movement_path):
       try:
-        os.remove(os.path.join(file.path, file.name))
+        os.remove(file.path, file.name)
       except FileNotFoundError:
         pass   
 
@@ -194,14 +191,14 @@ class FileQueue(object):
         os.path.join(self.queue_path, set_timestamp(file.name, now))
       )
 
-  def _lease_filename(self, filename):
+  def _lease_filename(self, filename, seconds):
     timestamp, rest = filename.split('--')
     now = int(time.time())
     new_filename = "{}--{}".format(now + seconds, rest)
     new_filepath = os.path.join(self.queue_path, new_filename)
 
     movements_filename = rest.split('.')[0] # uuid
-    movement_path = os.path.join(self.movement_path, movements_filename)
+    movements_path = os.path.join(self.movement_path, movements_filename)
 
     fd = open(movements_path, 'at')
     lock_file(fd)
@@ -220,8 +217,7 @@ class FileQueue(object):
     task['id'] = movements_filename
     return task
 
-  @retry
-  def lease(self, seconds):
+  def lease(self, seconds, num_tasks):
     def fmt(direntry):
       filename = direntry.name
       timestamp, _ = filename.split('--')
@@ -233,9 +229,9 @@ class FileQueue(object):
     for timestamp, filename in files:
       if timestamp > now:
         continue
-      if timestamp < mintime:
+      else:
         try:
-          return [ self._lease_filename(filename) ]
+          return [ self._lease_filename(filename, seconds) ]
         except OSError:
           continue
 
@@ -272,7 +268,7 @@ class FileQueue(object):
     )
     for file in all_files:
       try:
-        os.remove(os.path.join(file.path, file.name))
+        os.remove(file.path)
       except FileNotFoundError:
         pass
 
