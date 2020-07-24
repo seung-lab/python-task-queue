@@ -35,7 +35,7 @@ def touch_file(path):
 def move_file(src_path, dest_path):
   os.rename(src_path, dest_path)
 
-def lock_file(fd):
+def write_lock_file(fd):
   """
   Locks are bound to processes. A terminated process unlocks. 
   Non-blocking, raises OSError if unable to obtain a lock.
@@ -44,7 +44,31 @@ def lock_file(fd):
   will release locks for all fds. This means you must open the file
   and reuse that FD from start to finish.
   """
+
+  # https://docs.python.org/3/library/fcntl.html
+  # "On at least some systems, LOCK_EX can only be used if the file 
+  # descriptor refers to a file opened for writing."
+  # Locks: LOCK_EX (exclusive), LOCK_SH (shared), LOCK_NB (non-blocking)
+
   fcntl.lockf(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+  return fd
+
+def read_lock_file(fd):
+  """
+  Locks are bound to processes. A terminated process unlocks. 
+  Non-blocking, raises OSError if unable to obtain a lock.
+
+  Note that any closing of a file descriptor for the locked file
+  will release locks for all fds. This means you must open the file
+  and reuse that FD from start to finish.
+  """
+
+  # https://docs.python.org/3/library/fcntl.html
+  # "On at least some systems, LOCK_EX can only be used if the file 
+  # descriptor refers to a file opened for writing."
+  # Locks: LOCK_EX (exclusive), LOCK_SH (shared), LOCK_NB (non-blocking)
+
+  fcntl.lockf(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
   return fd
 
 def unlock_file(fd):
@@ -147,7 +171,7 @@ class FileQueueAPI(object):
     ident = get_id(task)
     movement_path = os.path.join(self.movement_path, ident)
 
-    fd = lock_file(open(movements_path, 'rwt'))
+    fd = read_lock_file(open(movements_path, 'rt'))
     contents = fd.read()
 
     for filename in reversed(contents.split('\n')):
@@ -201,7 +225,7 @@ class FileQueueAPI(object):
     movements_path = os.path.join(self.movement_path, movements_filename)
 
     fd = open(movements_path, 'at')
-    lock_file(fd)
+    write_lock_file(fd)
 
     move_file(
       os.path.join(self.queue_path, filename), 
@@ -244,10 +268,11 @@ class FileQueueAPI(object):
     ident = get_id(task)
 
     movements_file_path = os.path.join(self.movement_path, ident)
-    fd = open(movements_file_path, 'rt')
-    lock_file(fd)
-
+    fd = read_lock_file(open(movements_file_path, 'rt'))
     filenames = fd.read().split('\n')
+    fd.close()
+
+    fd = write_lock_file(open(movements_file_path, 'wt'))    
 
     for filename in filenames:
       if filename == '':
