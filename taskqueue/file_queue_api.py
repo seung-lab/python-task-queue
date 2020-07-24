@@ -141,13 +141,6 @@ class FileQueueAPI(object):
   def enqueued(self):
     return int(self.list())
 
-  def status(self):
-    resp = self._sqs.get_queue_attributes(
-      QueueUrl=self._qurl, 
-      AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
-    )
-    return resp['Attributes']
-
   def insert(self, tasks, delay_seconds=0):
     tasks = toiter(tasks)
 
@@ -236,9 +229,7 @@ class FileQueueAPI(object):
     fd.flush()
     fd.close() # unlocks POSIX advisory file lock
 
-    task = json.loads(read_file(new_filepath))
-    print('fresh read',task)
-    return task
+    return json.loads(read_file(new_filepath))
 
   def lease(self, seconds, num_tasks):
     def fmt(direntry):
