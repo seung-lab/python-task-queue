@@ -326,6 +326,11 @@ class TaskQueue(object):
     while self.enqueued > 0:
       time.sleep(interval_sec)
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exception_type, exception_value, traceback):
+    pass
 
 class LocalTaskQueue(object):
   def __init__(self, parallel=1, queue_name='', queue_server='', progress=True):
@@ -351,10 +356,9 @@ class LocalTaskQueue(object):
       }
       self.queue.append( (task, args, kwargs) )
 
-    self.execute(progress, parallel, total)
-
   def insert_all(self, *args, **kwargs):
-    return self.insert(*args, **kwargs)
+    self.insert(*args, **kwargs)
+    self.execute(self.progress)
 
   def poll(self, *args, **kwargs):
     pass
@@ -376,6 +380,12 @@ class LocalTaskQueue(object):
             pbar.update()
     
       self.queue = []
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exception_type, exception_value, traceback):
+    self.execute()
 
 class MockTaskQueue(LocalTaskQueue):
   pass
