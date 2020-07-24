@@ -243,22 +243,27 @@ class FileQueueAPI(object):
 
     now = nowfn()
     files = ( fmt(direntry) for direntry in os.scandir(self.queue_path) )
-    
+
+    leasable_files = []
+
     for timestamp, filename in files:
       if timestamp > now:
         continue
-      else:
-        try:
-          x = [ self._lease_filename(filename, seconds) ]
-          print('x', x)
-          return x
-        except OSError:
-          continue
+      leasable_files.append(filename)
+      if len(leasable_files) >= num_tasks:
+        break
 
-    return []
+    leases = []
+    for filename in leasable_files:
+      try:
+        lessee = self._lease_filename(filename, seconds)
+      except OSError:
+        continue
 
-  def acknowledge(self, task):
-    return self.delete(task)
+      if lessee is not None:
+        leases.append(lessee)
+
+    return leases
 
   def delete(self, task):
     ident = idfn(task)
