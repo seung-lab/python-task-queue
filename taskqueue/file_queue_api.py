@@ -144,6 +144,7 @@ class FileQueueAPI(object):
   def enqueued(self):
     return int(self.list())
 
+  @retry
   def insert(self, tasks, delay_seconds=0):
     tasks = toiter(tasks)
 
@@ -164,6 +165,7 @@ class FileQueueAPI(object):
         filename + "\n"
       )
 
+  @retry
   def renew_lease(self, task, seconds):
     ident = idfn(task)
     movement_path = os.path.join(self.movement_path, ident)
