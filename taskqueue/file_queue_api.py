@@ -10,7 +10,7 @@ import time
 import tenacity
 
 from .registered_task import totask, totaskid
-from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip
+from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip, toabs
 
 retry = tenacity.retry(
   reraise=True, 
@@ -135,10 +135,12 @@ class FileQueueAPI(object):
   time is very long.
   """
   def __init__(self, path):
+    path = toabs(path)
     self.path = path
 
     self.movement_path = mkdir(os.path.join(path, 'movement'))
     self.queue_path = mkdir(os.path.join(path, 'queue'))
+    self.batch_size = 10
 
   @property
   def enqueued(self):

@@ -39,6 +39,8 @@ class AWSTaskQueueAPI(object):
         print(qurl)
         raise
 
+    self.batch_size = AWS_BATCH_SIZE
+
   @property
   def enqueued(self):
     status = self.status()

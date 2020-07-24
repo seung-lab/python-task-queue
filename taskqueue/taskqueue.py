@@ -132,7 +132,10 @@ class TaskQueue(object):
       multiprocess_upload(self.__class__, mkpath(self.path), tasks, parallel=parallel)
       return
 
-    batch_size = AWS_DEFAULT_REGION
+    try:
+      batch_size = self.api.batch_size
+    except:
+      batch_size = 1
     
     schedule_jobs(
       fns=self._gen_insert_all_tasks(
@@ -142,6 +145,7 @@ class TaskQueue(object):
       progress='Inserting',
       total=total,
       green=self.green,
+      batch_size=batch_size,
     )
 
   def insert_all(self, *args, **kwargs):
@@ -396,7 +400,7 @@ class MockTaskQueue(LocalTaskQueue):
 class GreenTaskQueue(TaskQueue):
   def __init__(self, *args, **kwargs):
     kwargs['green'] = True
-    super(TaskQueue, self).__init__(*args, **kwargs)
+    super(GreenTaskQueue, self).__init__(*args, **kwargs)
 
 # Necessary to define here to make the 
 # function picklable

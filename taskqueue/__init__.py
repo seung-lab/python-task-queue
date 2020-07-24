@@ -1,6 +1,6 @@
 from .registered_task import RegisteredTask, MockTask, PrintTask
 from .taskqueue import (
-  TaskQueue, MockTaskQueue, LocalTaskQueue, 
+  TaskQueue, MockTaskQueue, GreenTaskQueue, LocalTaskQueue, 
   multiprocess_upload, QueueEmptyError, totask
 )
 

@@ -9,9 +9,9 @@ DEFAULT_THREADS = 20
 
 def schedule_threaded_jobs(
     fns, concurrency=DEFAULT_THREADS, 
-    progress=None, total=None
+    progress=None, total=None, batch_size=1
   ):
-
+  
   if total is None:
     try:
       total = len(fns)
@@ -26,7 +26,7 @@ def schedule_threaded_jobs(
   def updatefn(fn):
     def realupdatefn(iface):
       res = fn()
-      pbar.update(1)
+      pbar.update(batch_size)
       results.append(res)
     return realupdatefn
 
@@ -38,7 +38,7 @@ def schedule_threaded_jobs(
 
 def schedule_green_jobs(
     fns, concurrency=DEFAULT_THREADS, 
-    progress=None, total=None
+    progress=None, total=None, batch_size=1
   ):
   import gevent.pool
 
@@ -56,7 +56,7 @@ def schedule_green_jobs(
   def updatefn(fn):
     def realupdatefn():
       res = fn()
-      pbar.update(1)
+      pbar.update(batch_size)
       results.append(res)
     return realupdatefn
 
@@ -72,7 +72,8 @@ def schedule_green_jobs(
 
 def schedule_jobs(
     fns, concurrency=DEFAULT_THREADS, 
-    progress=None, total=None, green=False
+    progress=None, total=None, green=False,
+    batch_size=1
   ):
   """
   Given a list of functions, execute them concurrently until
@@ -92,8 +93,8 @@ def schedule_jobs(
     return [ fn() for fn in tqdm(fns, disable=(not progress), desc=progress) ]
 
   if green:
-    return schedule_green_jobs(fns, concurrency, progress, total)
+    return schedule_green_jobs(fns, concurrency, progress, total, batch_size)
 
-  return schedule_threaded_jobs(fns, concurrency, progress, total)
+  return schedule_threaded_jobs(fns, concurrency, progress, total, batch_size)
 
 
