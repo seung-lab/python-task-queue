@@ -76,22 +76,25 @@ def unlock_file(fd):
   fcntl.lockf(fd, fcntl.LOCK_UN)
   return fd
 
-def get_id(task):
+def idfn(task):
   if isinstance(task, STRING_TYPES):
-    return task
-  try:
-    return task.id
-  except AttributeError:
-    return task['id']
+    ident = task
+  else:
+    try:
+      ident = task.id
+    except AttributeError:
+      ident = task['id']
+
+  if "--" in ident:
+    ident = ident.split("--")[1]
+  return os.path.splitext(ident)[0] # removes .json if present
 
 def set_timestamp(filename, timestamp):
   old_timestamp, rest = filename.split('--')
   return "{}--{}".format(timestamp, rest)
 
-def add_seconds_to_timestamp(filename, seconds):
-  timestamp, rest = filename.split('--')
-  timestamp = int(timestamp) + int(seconds)
-  return "{}--{}".format(timestamp, rest)
+def nowfn():
+  return int(time.time())
 
 class FileQueueAPI(object):
   """
@@ -146,33 +149,37 @@ class FileQueueAPI(object):
 
     timestamp = 0 # immediately available, never assigned
     if delay_seconds > 0:
-      timestamp = int(time.time()) + delay_seconds # unix timestamp
+      timestamp = nowfn() + delay_seconds # unix timestamp
 
     for task in tasks:
-      identifier = uuid.uuid4()
+      identifier = str(uuid.uuid4())
       filename = "{}--{}.json".format(timestamp, identifier)
-      task['id'] = str(identifier)
+      task['id'] = identifier
       write_file(
         os.path.join(self.queue_path, filename),
         jsonify(task)
       )
-      touch_file(
-        os.path.join(self.movement_path, str(identifier))
+      write_file(
+        os.path.join(self.movement_path, identifier),
+        filename + "\n"
       )
 
   def renew_lease(self, task, seconds):
-    ident = get_id(task)
+    ident = idfn(task)
     movement_path = os.path.join(self.movement_path, ident)
 
-    fd = read_lock_file(open(movements_path, 'rt'))
+    fd = read_lock_file(open(movement_path, 'rt'))
     contents = fd.read()
+    fd.close()
+
+    fd = write_lock_file(open(movement_path, 'wt'))
 
     for filename in reversed(contents.split('\n')):
       if filename == '':
         continue
 
       old_path = os.path.join(self.queue_path, filename)
-      new_filename = add_seconds_to_timestamp(filename, seconds)
+      new_filename = set_timestamp(filename, nowfn() + int(seconds))
       new_path = os.path.join(self.queue_path, new_filename)
       try:
         move_file(old_path, new_path)
@@ -195,13 +202,13 @@ class FileQueueAPI(object):
 
   def make_all_available(self):
     """Voids leases and sets all tasks to available."""
-    now = int(time.time())
     for file in os.scandir(self.movement_path):
       try:
         os.remove(file.path, file.name)
       except FileNotFoundError:
         pass   
 
+    now = nowfn()
     for file in os.scandir(self.queue_path):
       move_file(
         os.path.join(self.queue_path, file.name),
@@ -209,12 +216,9 @@ class FileQueueAPI(object):
       )
 
   def _lease_filename(self, filename, seconds):
-    timestamp, rest = filename.split('--')
-    now = int(time.time())
-    new_filename = "{}--{}".format(now + seconds, rest)
+    new_filename = set_timestamp(filename, nowfn() + int(seconds))
     new_filepath = os.path.join(self.queue_path, new_filename)
-
-    movements_filename = rest.split('.')[0] # uuid
+    movements_filename = idfn(new_filename)
     movements_path = os.path.join(self.movement_path, movements_filename)
 
     fd = write_lock_file(open(movements_path, 'at'))
@@ -237,7 +241,7 @@ class FileQueueAPI(object):
       timestamp, _ = filename.split('--')
       return (int(timestamp), filename)
 
-    now = int(time.time())
+    now = nowfn()
     files = ( fmt(direntry) for direntry in os.scandir(self.queue_path) )
     
     for timestamp, filename in files:
@@ -257,7 +261,7 @@ class FileQueueAPI(object):
     return self.delete(task)
 
   def delete(self, task):
-    ident = get_id(task)
+    ident = idfn(task)
 
     movements_file_path = os.path.join(self.movement_path, ident)
     try:

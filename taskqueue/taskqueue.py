@@ -122,6 +122,7 @@ class TaskQueue(object):
     return [ totask(x) for x in iter(self.api) ]
 
   def insert(self, tasks, delay_seconds=0, total=None, parallel=1):
+    tasks = toiter(tasks)
     total = totalfn(tasks, total)
 
     if parallel not in (1, False) and total is not None and total > 1:

@@ -116,6 +116,33 @@ def test_multi_threaded_insertion(protocol, green, threads):
 #     with TaskQueue(QURL) as tq:
 #       tq.purge()
 
+def test_renew():
+  path = getpath('fq')
+  tq = TaskQueue(path)
+  tq.purge()
+
+  tq.insert(PrintTask('hello'))
+
+  ts = lambda fname: int(fname.split('--')[0])
+  ident = lambda fname: fname.split('--')[1]
+
+  filenames = os.listdir(tq.api.queue_path)
+  assert len(filenames) == 1
+  filename = filenames[0]
+
+  assert ts(filename) == 0
+  identity = ident(filename)
+
+  now = time.time()
+  tq.renew(filename, 1)
+
+  filenames = os.listdir(tq.api.queue_path)
+  assert len(filenames) == 1
+  filename = filenames[0]
+  print(filename)
+  assert ts(filename) >= int(time.time()) + 1
+  assert ident(filename) == identity
+
 @pytest.mark.parametrize('protocol', PROTOCOL)
 def test_400_errors(protocol):
   path = getpath(protocol) 
