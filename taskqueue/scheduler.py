@@ -89,8 +89,8 @@ def schedule_jobs(
   """
   if concurrency < 0:
     raise ValueError("concurrency value cannot be negative: {}".format(concurrency))
-  elif concurrency == 0:
-    return [ fn() for fn in tqdm(fns, disable=(not progress), desc=progress) ]
+  elif concurrency == 0 or total == 1:
+    return [ fn() for fn in tqdm(fns, disable=(not progress or total == 1), desc=progress) ]
 
   if green:
     return schedule_green_jobs(fns, concurrency, progress, total, batch_size)
