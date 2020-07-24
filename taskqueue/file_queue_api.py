@@ -198,10 +198,10 @@ class FileQueueAPI(object):
     fd.close() # releases POSIX lock
 
   def cancel_lease(self, task):
-    raise NotImplementedError()
+    self.renew_lease(task, 0)
 
-  def make_all_available(self):
-    """Voids leases and sets all tasks to available."""
+  def release_all(self):
+    """Voids all leases and sets all tasks to available."""
     for file in os.scandir(self.movement_path):
       try:
         os.remove(file.path, file.name)
