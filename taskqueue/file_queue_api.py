@@ -237,7 +237,7 @@ class FileQueueAPI(object):
       fd.close()
       return None
 
-    fd.write(str(filename) + '\n')
+    fd.write(str(new_filepath) + '\n')
 
     fd.flush()
     fd.close() # unlocks POSIX advisory file lock
