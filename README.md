@@ -42,11 +42,10 @@ For small jobs, you might want to use one or more processes to execute the tasks
 ```python
 from taskqueue import LocalTaskQueue
 
-with LocalTaskQueue(parallel=5) as tq: # use 5 processes
-  for _ in range(1000):
-    tq.insert(
-      PrintTask(i)
-    )
+tq = LocalTaskQueue(parallel=5) # use 5 processes
+tq.insert_all(
+  ( PrintTask(i) for i in range(2000) )
+)
 ```
 This will load the queue with 1000 print tasks then execute them across five processes.
 
@@ -54,17 +53,18 @@ This will load the queue with 1000 print tasks then execute them across five pro
 
 Set up an SQS queue and acquire an aws-secret.json that is compatible with CloudVolume. Generate the tasks and insert them into the cloud queue. 
 
+You can alternatively set up a file based queue that has the same time-based leasing property of an SQS queue.
+
 ```python
+# import gevent.monkey 
+# gevent.monkey.patch_all()
 from taskqueue import TaskQueue
 
-# new and fast
-tq = TaskQueue('sqs-queue-name')
-tq.insert_all(( PrintTask(i) for i in range(1000) )) # can use lists or generators
+# region is SQS specific, green means cooperative threading
+tq = TaskQueue('sqs://queue-name', region="us-east1-b", green=False) 
+tq = TaskQueue('fq:///path/to/queue/directory/') # file queue ('fq') 
 
-# older 10x slower alternative
-with TaskQueue('sqs-queue-name') as tq:
-  for i in range(1000):
-    tq.insert(PrintTask(i))
+tq.insert(( PrintTask(i) for i in range(1000) )) # can use any iterable
 ```
 
 This inserts 1000 PrintTask JSON descriptions into your SQS queue.
@@ -75,7 +75,7 @@ Somewhere else, you'll do the following (probably across multiple workers):
 from taskqueue import TaskQueue
 import MY_MODULE # MY_MODULE contains the definitions of RegisteredTasks
 
-tq = TaskQueue('sqs-queue-name')
+tq = TaskQueue('sqs://queue-name')
 tq.poll(lease_Seconds=int(LEASE_SECONDS))
 ```
 
