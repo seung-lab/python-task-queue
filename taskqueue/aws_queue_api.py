@@ -44,6 +44,9 @@ class AWSTaskQueueAPI(object):
     status = self.status()
     return int(status['ApproximateNumberOfMessages']) + int(status['ApproximateNumberOfMessagesNotVisible'])
 
+  def is_empty():
+    return self.enqueued == 0
+
   def status(self):
     resp = self._sqs.get_queue_attributes(
       QueueUrl=self._qurl, 

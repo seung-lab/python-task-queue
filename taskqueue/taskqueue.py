@@ -107,6 +107,9 @@ class TaskQueue(object):
     """
     return self.api.enqueued
 
+  def is_empty(self):
+    return self.api.is_empty()
+
   # def status(self):
   #   """
   #   Gets information about the TaskQueue
