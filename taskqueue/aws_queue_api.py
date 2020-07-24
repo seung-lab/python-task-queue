@@ -8,6 +8,8 @@ import botocore.errorfactory
 from .lib import toiter, sip
 from .secrets import aws_credentials
 
+AWS_BATCH_SIZE = 10 
+
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):
     """
@@ -139,8 +141,10 @@ class AWSTaskQueueAPI(object):
     return self
 
   def list(self):
-    return self._request(num_tasks=10, visibility_timeout=0)
-      
+    return list(self)
+    
+  def __iter__(self):
+    return iter(self._request(num_tasks=10, visibility_timeout=0))
       
 
 

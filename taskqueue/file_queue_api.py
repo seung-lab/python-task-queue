@@ -9,6 +9,7 @@ import time
 
 import tenacity
 
+from .registered_task import totask, totaskid
 from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip
 
 retry = tenacity.retry(
@@ -77,13 +78,11 @@ def unlock_file(fd):
 
 def get_id(task):
   if isinstance(task, STRING_TYPES):
-    ident = task
-  else:
-    try:
-      ident = task._id
-    except AttributeError:
-      ident = task['id']
-  return ident
+    return task
+  try:
+    return task.id
+  except AttributeError:
+    return task['id']
 
 def set_timestamp(filename, timestamp):
   old_timestamp, rest = filename.split('--')
@@ -159,6 +158,7 @@ class FileQueueAPI(object):
     for task in tasks:
       identifier = uuid.uuid4()
       filename = "{}--{}.json".format(timestamp, identifier)
+      task['id'] = str(identifier)
       write_file(
         os.path.join(self.queue_path, filename),
         jsonify(task)
@@ -224,8 +224,7 @@ class FileQueueAPI(object):
     movements_filename = rest.split('.')[0] # uuid
     movements_path = os.path.join(self.movement_path, movements_filename)
 
-    fd = open(movements_path, 'at')
-    write_lock_file(fd)
+    fd = write_lock_file(open(movements_path, 'at'))
 
     move_file(
       os.path.join(self.queue_path, filename), 
@@ -238,7 +237,7 @@ class FileQueueAPI(object):
     fd.close() # unlocks POSIX advisory file lock
 
     task = json.loads(read_file(new_filepath))
-    task['id'] = movements_filename
+    print('fresh read',task)
     return task
 
   def lease(self, seconds, num_tasks):
@@ -255,7 +254,9 @@ class FileQueueAPI(object):
         continue
       else:
         try:
-          return [ self._lease_filename(filename, seconds) ]
+          x = [ self._lease_filename(filename, seconds) ]
+          print('x', x)
+          return x
         except OSError:
           continue
 
@@ -268,7 +269,11 @@ class FileQueueAPI(object):
     ident = get_id(task)
 
     movements_file_path = os.path.join(self.movement_path, ident)
-    fd = read_lock_file(open(movements_file_path, 'rt'))
+    try:
+      fd = read_lock_file(open(movements_file_path, 'rt'))
+    except FileNotFoundError:
+      return
+
     filenames = fd.read().split('\n')
     fd.close()
 
@@ -305,7 +310,11 @@ class FileQueueAPI(object):
       return True
 
   def __iter__(self):
-    return ( f.name for f in os.scandir(self.queue_path) )
+    def read(path):
+      with open(path, 'rt') as f:
+        return f.read()
+
+    return ( read(f.path) for f in os.scandir(self.queue_path) )
 
   def __len__(self):
     return itertools.count(iter(self))

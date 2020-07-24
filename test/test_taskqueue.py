@@ -18,6 +18,20 @@ elif TRAVIS_BRANCH == 'master':
 else:
   QURL = 'travis-pull-queue-2'
 
+FILE_QURL = '/tmp/removeme/taskqueue/fq'
+
+QURLS = {
+  'sqs': QURL,
+  'fq': FILE_QURL,
+}
+
+PROTOCOL = ('fq', 'sqs')
+
+def getpath(protocol):
+  global QURLS
+  qurl = QURLS[protocol]
+  return mkpath(ExtractedPath(protocol, qurl))
+
 class ExecutePrintTask(RegisteredTask):
   def __init__(self):
     super(ExecutePrintTask, self).__init__()
@@ -42,17 +56,9 @@ def test_task_creation():
       "with_kwargs": None
   }
 
-@pytest.mark.parametrize('protocol', ('fq',))
+@pytest.mark.parametrize('protocol', PROTOCOL)
 def test_get(protocol):
-  global QURL
-
-  if protocol == 'fq':
-    qurl = '/tmp/removeme/taskqueue/fq'
-  else:
-    qurl = QURL
-
-  path = mkpath(ExtractedPath(protocol, qurl))
-
+  path = getpath(protocol) 
   tq = TaskQueue(path, n_threads=0)
 
   n_inserts = 5
@@ -63,10 +69,10 @@ def test_get(protocol):
     t = tq.lease()
     tq.delete(t)
 
-def test_single_threaded_insertion():
-  global QURL
-
-  tq = TaskQueue(QURL, n_threads=0)
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_single_threaded_insertion(protocol):
+  path = getpath(protocol) 
+  tq = TaskQueue(path, n_threads=0)
 
   tq.purge()
   
@@ -77,11 +83,13 @@ def test_single_threaded_insertion():
 
   tq.purge()
 
+@pytest.mark.parametrize('protocol', PROTOCOL)
 @pytest.mark.parametrize('green', (True, False))
 @pytest.mark.parametrize('threads', (1, 2, 10, 20, 40))
-def test_multi_threaded_insertion(green, threads):
-  global QURL
-  tq = TaskQueue(QURL, n_threads=threads, green=green)
+def test_multi_threaded_insertion(protocol, green, threads):
+  path = getpath(protocol) 
+
+  tq = TaskQueue(path, n_threads=threads, green=green)
 
   n_inserts = 40
   tq.purge()
@@ -108,9 +116,11 @@ def test_multi_threaded_insertion(green, threads):
 #     with TaskQueue(QURL) as tq:
 #       tq.purge()
 
-def test_400_errors():
-  global QURL
-  tq = TaskQueue(QURL, n_threads=0)
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_400_errors(protocol):
+  path = getpath(protocol) 
+
+  tq = TaskQueue(path, n_threads=0)
   tq.delete('nonexistent')
 
 def test_local_taskqueue():
@@ -130,11 +140,12 @@ def test_local_taskqueue():
   epts = [ PrintTask(i) for i in range(200) ]
   tq.insert(epts)
 
-def test_parallel_insert_all():
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_parallel_insert_all(protocol):
   import pathos_issue
 
-  global QURL
-  tq = TaskQueue(QURL, green=True)
+  path = getpath(protocol) 
+  tq = TaskQueue(path, green=True)
 
   tasks = pathos_issue.crt_tasks(5, 20)
   tq.insert(tasks, parallel=2)

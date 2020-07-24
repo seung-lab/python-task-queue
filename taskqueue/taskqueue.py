@@ -20,29 +20,14 @@ from tqdm import tqdm
 from .threaded_queue import ThreadedQueue
 from .lib import yellow, scatter, sip, toiter
 
-from .aws_queue_api import AWSTaskQueueAPI
+from .aws_queue_api import AWSTaskQueueAPI, AWS_BATCH_SIZE
 from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
-from .registered_task import RegisteredTask, deserialize
+from .registered_task import RegisteredTask, deserialize, totask, totaskid
 from .scheduler import schedule_jobs
 from .secrets import (
   AWS_DEFAULT_REGION
 )
-
-AWS_BATCH_SIZE = 10 
-
-def totask(task):
-  if isinstance(task, RegisteredTask):
-    return task
-
-  taskobj = deserialize(task['payload'])
-  taskobj._id = task['id']
-  return taskobj
-
-def totaskid(taskid):
-  if isinstance(taskid, RegisteredTask):
-    return taskid.id
-  return taskid
 
 def totalfn(iterator, total):
   if total is not None:
@@ -134,7 +119,7 @@ class TaskQueue(object):
     whether or not they are currently leased, 
     up to a maximum of 100.
     """
-    return [ totask(x) for x in self.api.list() ]
+    return [ totask(x) for x in iter(self.api) ]
 
   def insert(self, tasks, delay_seconds=0, total=None, parallel=1):
     total = totalfn(tasks, total)
