@@ -2,7 +2,7 @@
 
 # python-task-queue
 
-This package provides a client and system for generating, uploading, leasing, and executing dependency free tasks both locally and in the cloud using AWS SQS.
+This package provides a client and system for generating, uploading, leasing, and executing dependency free tasks both locally and in the cloud using AWS SQS or on a single machine or cluster with a common file system using file based queues.
 
 ## Installation
 
@@ -15,7 +15,7 @@ The task queue uses your CloudVolume secrets located in `$HOME/.cloudvolume/secr
 
 ## Usage 
 
-Define a class that inherits from taskqueue.RegisteredTask and implments the `execute` method. RegisteredTasks contain logic that will render their attributes into a JSON payload and can be reconstituted into a live class on the other side of a task queue.  
+Define a class that inherits from taskqueue.RegisteredTask and implements the `execute` method. RegisteredTasks contain logic that will render their attributes into a JSON payload and can be reconstituted into a live class on the other side of a task queue.  
 
 Tasks can be loaded into queues locally or in the cloud and executed later. Here's an example implementation of a trivial `PrintTask`. The attributes of your container class should be simple values that can be easily encoded into JSON such as ints, floats, strings, and numpy arrays. Let the `execute` method download and manipulate heavier data. If you're feeling curious, you can see what JSON a task will turn into by calling `task.payload()`.
 
@@ -43,17 +43,21 @@ For small jobs, you might want to use one or more processes to execute the tasks
 from taskqueue import LocalTaskQueue
 
 tq = LocalTaskQueue(parallel=5) # use 5 processes
-tq.insert_all(
-  ( PrintTask(i) for i in range(2000) )
-)
+tasks = ( PrintTask(i) for i in range(2000) )
+
+tq.insert_all(tasks) # performs on-line execution (naming is historical)
+
+# alterternative serial model
+tq.insert(tasks)
+tq.execute()
 ```
 This will load the queue with 1000 print tasks then execute them across five processes.
 
-## Cloud Usage
+## Cloud and Cluster Usage
 
-Set up an SQS queue and acquire an aws-secret.json that is compatible with CloudVolume. Generate the tasks and insert them into the cloud queue. 
+1) Set up an SQS queue and acquire an aws-secret.json that is compatible with CloudVolume. Generate the tasks and insert them into the cloud queue.  
 
-You can alternatively set up a file based queue that has the same time-based leasing property of an SQS queue.
+2) You can alternatively set up a file based queue that has the same time-based leasing property of an SQS queue.
 
 ```python
 # import gevent.monkey 
@@ -83,35 +87,34 @@ Poll will check SQS for a new task periodically. If a task is found, it will exe
 
 ## Motivation
 
-Simple (i.e. dependency free) distributed task execution engines (such as [Igneous](https://github.com/seung-lab/igneous/)) often make use of cloud based queues like Amazon Simple Queue Service (SQS). In the connectomics field we process petascale images which requires generating hundreds of thousands or millions of cloud tasks per a run. In one case, we were processing serial blocks of a large image where each block depended on the previous block's completion. Each block's run required the generation and upload of millions of tasks and the use of thousands of workers. The workers would rapidly drain the task queue and it was important to ensure that it could be fed fast enough to prevent starvation of this enormous cluster.  
+Distributed dependency free task execution engines (such as [Igneous](https://github.com/seung-lab/igneous/)) often make use of cloud based queues like Amazon Simple Queue Service (SQS). In the connectomics field we process petascale images which requires generating hundreds of thousands or millions of cloud tasks per a run. In one case, we were processing serial blocks of a large image where each block depended on the previous block's completion. Each block's run required the generation and upload of millions of tasks and the use of thousands of workers. The workers would rapidly drain the task queue and it was important to ensure that it could be fed fast enough to prevent starvation of this enormous cluster. 
 
-There are a few strategies for accomplishing this. One way might be to use a fully featured DAG supporting engine which potentially could generate the next task on demand. However, we were experienced with SQS and had designed our architecture around it. Furthermore, it was, in our experience, robust to thousands of machines knocking on it. This does not discount that there are probably better methods out there, merely that this was convenient for us.
+There are a few strategies for accomplishing this. One way might be to use a fully featured DAG supporting engine which could generate the next task on demand. However, we were experienced with SQS and had designed our architecture around it. Furthermore, it was, in our experience, robust to thousands of machines knocking on it. This does not discount that there could be better methods out there, but this was convenient for us.
 
-Accepting this constraint, the two major ways to populate the SQS queue would be a task generating task that could enlist hundreds or thousands of processors or we could just make our task generating client fast and memory efficient and use a handful of cores for multiprocessing. Keeping things simple and local allows for greater operational flexibility and the addition of a drop in mutiprocessing execution engine allows for the omission of cloud services for small jobs without heavily modifying the architecture. Importantly, improved small scale performance doesn't preclude the later development of metageneration facilities. 
+The two major ways to populate the SQS queue at scale would be a task generating task so a single processor could could enlist hundreds or thousands of others or we could just make our task generating client fast and memory efficient and use a handful of cores for multiprocessing. Keeping things simple and local allows for greater operational flexibility and the addition of a drop-in mutiprocessing execution engine allows for the omission of cloud services for small jobs. Importantly, improved small scale performance doesn't preclude the later development of metageneration facilities. 
 
-By default, the Python task queue libraries are single threaded and blocking, resulting in upload rates of at most tens of tasks per second. It is possible to do much better by using threads, mutliple processes, and batching requests. TaskQueue has been witnessed achiving upload rates of over 3000 tasks per second single core, and around 10,000 per second multicore on a single machine. This is sufficient to keep a huge cluster fed and allows for enormous programmer flexibility as they can populate queues from their local machine using simple scripts.
+By default, the Python task queue libraries are single threaded and blocking, resulting in upload rates of at most tens of tasks per second. It is possible to do much better by using threads, multiple processes, and by batching requests. TaskQueue has achivied upload rates of over 3000 tasks per second single core, and around 10,000 per second multicore on a single machine. This is sufficient to keep our cluster fed and allows for programmer flexibility as they can populate queues from their local machine using simple scripts.
 
 ## How to Achieve High Performance
 
-Attaining the above quoted upload rates is fairly simple but takes a few tricks to tune the queue. By default, TaskQueue will provide upload rates of hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage.
+Attaining the quoted upload rates is simple but takes a few tricks to tune the queue. By default, TaskQueue will upload hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage.
 
 ```python 
-# Listing 1: 100s per second, high memory usage, non-zero latency
+# Listing 1: 100-1000s per second, high memory usage, non-zero latency
 
 tasks = [ PrintTask(i) for i in range(1000000) ]
-with TaskQueue('sqs-queue-name') as tq:
-  for task in tasks:
-    tq.insert(task)
+tq = TaskQueue('sqs://queue-name')
+tq.insert(tasks)
 ```
 
 The listing above allows you to use ordinary iterative programming techniques to achieve an upload rate of hundreds per a second without much configuration, a marked improvement over simply using boto nakedly. However, the initial generation of a list of tasks uses a lot of memory and introduces a delay while the list is generated. 
 
 ```python 
-# Listing 2: 100s per second, usually low memory usage, near-zero latency
+# Listing 2: 100-1000s per second, low memory usage, near-zero latency
 
-with TaskQueue('sqs-queue-name') as tq:
-  for i in range(1000000):
-    tq.insert(PrintTask(i))
+tasks = ( PrintTask(i) for i in range(1000000) )
+tq = TaskQueue('sqs://queue-name')
+tq.insert(tasks)
 ``` 
 
 Listing 2 generates tasks and begins uploading them simultaneously. Initially, this results in low memory usage, but sometimes task generation begins to outpace uploading and causes memory usage to grow. Regardless, upload begins immediately so no latency is introduced. 
@@ -132,7 +135,7 @@ Listing 3 takes advantage of SQS batch upload which allows for submitting 10 tas
 # Listing 4: 100s-1000s per second, low memory usage, near-zero latency 
 
 tasks = ( PrintTask(i) for i in range(1000000) ) 
-with TaskQueue('sqs-queue-name') as tq:
+with TaskQueue('sqs://queue-name') as tq:
   tq.insert_all(tasks, total=(end - start))
 ```
 
@@ -145,11 +148,11 @@ As generators do not support the `len` operator, we manually pass in the number 
 
 import gevent.monkey 
 gevent.monkey.patch_all()
-from taskqueue import GreenTaskQueue 
+from taskqueue import TaskQueue 
 
 tasks = ( PrintTask(i) for i in range(1000000) ) 
-with GreenTaskQueue('sqs-queue-name') as tq:
-  tq.insert_all(tasks, total=(end - start))
+tq = TaskQueue('sqs://queue-name', green=True)
+tq.insert(tasks, total=1000000) # total helps the progress bar
 ```
 
 In Listing 5, we replace TaskQueue with GreenTaskQueue. Under the hood, TaskQueue relies on Python kernel threads to achieve concurrent IO. However, on systems with mutliple cores, especially those in a virutalized or NUMA context, the OS will tend to distribute the threads fairly evenly between cores leading to high context-switching overhead. Ironically, a more powerful multicore system can lead to lower performance. To remedy this issue, we introduce a user-space cooperative threading model (green threads) using gevent (which depending on your system is uses either libev or libuv for an event loop).  
@@ -161,14 +164,14 @@ This can result in a substantial performance increase on some systems. Typically
 
 import gevent.monkey 
 gevent.monkey.patch_all()
-from taskqueue import GreenTaskQueue 
+from taskqueue import TaskQueue 
 from concurrent.futures import ProcessPoolExecutor 
 
 def upload(args):
   start, end = args
   tasks = ( PrintTask(i) for i in range(start, end) ) 
-  with GreenTaskQueue('sqs-queue-name') as tq:
-    tq.insert_all(tasks, total=(end - start)) 
+  tq = TaskQueue('sqs://queue-name', green=True)
+  tq.insert(tasks, total=(end - start)) 
 
 task_ranges = [ (0, 250000), (250000, 500000), (500000, 750000), (750000, 1000000) ]
 with ProcessPoolExecutor(max_workers=4) as pool:
@@ -188,7 +191,7 @@ Third, as described in the narrative for Listing 5, the GreenTaskQueue has less 
 
 import gevent.monkey 
 gevent.monkey.patch_all()
-from taskqueue import GreenTaskQueue 
+from taskqueue import TaskQueue 
 from concurrent.futures import ProcessPoolExecutor 
 
 class PrintTaskIterator(object):
@@ -202,8 +205,8 @@ class PrintTaskIterator(object):
       yield PrintTask(i)
 
 def upload(tsks):
-  tq = GreenTaskQueue('sqs-queue-name')
-  tq.insert_all(tsks)
+  tq = TaskQueue('sqs://queue-name', green=True)
+  tq.insert(tsks)
 
 tasks = [ PrintTaskIterator(0, 100), PrintTaskIterator(100, 200) ]
 with ProcessPoolExecutor(max_workers=2) as execute:
@@ -218,7 +221,7 @@ If you insist on wanting to pass generators to your subprocesses, you can use it
 import gevent.monkey 
 gevent.monkey.patch_all(thread=False)
 import copy
-from taskqueue import GreenTaskQueue
+from taskqueue import TaskQueue
 
 class PrintTaskIterator(object):
   def __init__(self, start, end):
@@ -235,8 +238,8 @@ class PrintTaskIterator(object):
     for i in range(self.start, self.end):
       yield PrintTask(i)
 
-tq = GreenTaskQueue('sqs-queue-name')
-tq.insert_all(PrintTaskIterator(0,200), parallel=2)
+tq = TaskQueue('sqs://queue-name', green=True)
+tq.insert(PrintTaskIterator(0,200), parallel=2)
 ```
 
 If you design your iterators such that the slice operator works, TaskQueue can
