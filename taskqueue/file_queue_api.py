@@ -217,6 +217,7 @@ class FileQueueAPI(object):
         os.path.join(self.queue_path, set_timestamp(file.name, now))
       )
 
+  @retry
   def _lease_filename(self, filename, seconds):
     new_filename = set_timestamp(filename, nowfn() + int(seconds))
     new_filepath = os.path.join(self.queue_path, new_filename)
@@ -225,10 +226,14 @@ class FileQueueAPI(object):
 
     fd = write_lock_file(open(movements_path, 'at'))
 
-    move_file(
-      os.path.join(self.queue_path, filename), 
-      new_filepath
-    )
+    try:
+      move_file(
+        os.path.join(self.queue_path, filename), 
+        new_filepath
+      )
+    except FileNotFoundError:
+      fd.close()
+      return None
 
     fd.write(str(filename) + '\n')
 
