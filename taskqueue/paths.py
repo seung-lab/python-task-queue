@@ -21,7 +21,7 @@ def pop_protocol(cloudpath):
   match = re.match(protocol_re, cloudpath)
 
   if not match:
-    return (None, cloudpath)
+    return ('sqs', cloudpath)
 
   (protocol,) = match.groups()
   cloudpath = re.sub(protocol_re, '', cloudpath, count=1)
