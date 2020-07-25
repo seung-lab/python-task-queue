@@ -2,6 +2,7 @@ import fcntl
 import itertools
 import json
 import os.path
+import random
 import re
 import shutil
 import uuid
@@ -36,6 +37,7 @@ def touch_file(path):
 def move_file(src_path, dest_path):
   os.rename(src_path, dest_path)
 
+@retry
 def write_lock_file(fd):
   """
   Locks are bound to processes. A terminated process unlocks. 
@@ -54,6 +56,7 @@ def write_lock_file(fd):
   fcntl.lockf(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
   return fd
 
+@retry
 def read_lock_file(fd):
   """
   Locks are bound to processes. A terminated process unlocks. 
@@ -255,10 +258,16 @@ class FileQueueAPI(object):
 
     leasable_files = []
 
-    for timestamp, filename in files:
-      if timestamp > now:
-        continue
-      leasable_files.append(filename)
+    for batch in sip(files, 100):
+      random.shuffle(batch)
+
+      for timestamp, filename in batch:
+        if timestamp > now:
+          continue
+        leasable_files.append(filename)
+        if len(leasable_files) >= num_tasks:
+          break
+
       if len(leasable_files) >= num_tasks:
         break
 
@@ -274,6 +283,7 @@ class FileQueueAPI(object):
 
     return leases
 
+  @retry
   def delete(self, task):
     ident = idfn(task)
 
@@ -298,7 +308,10 @@ class FileQueueAPI(object):
         pass
 
     fd.close()
-    os.remove(movements_file_path)
+    try:
+      os.remove(movements_file_path)
+    except FileNotFoundError:
+      pass
 
   def purge(self):
     all_files = itertools.chain(
