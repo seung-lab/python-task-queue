@@ -70,6 +70,10 @@ class TaskQueue(object):
     if self.green:
       self.check_monkey_patch_status()
 
+  @property
+  def qualified_path(self):
+    return mkpath(self.path)
+
   def initialize_api(self, path, kwargs):
     if path.protocol == 'sqs':
       return AWSTaskQueueAPI(qurl=path.path, region_name=kwargs.get('region', AWS_DEFAULT_REGION))
