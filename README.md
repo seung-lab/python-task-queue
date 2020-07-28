@@ -69,6 +69,9 @@ tq = TaskQueue('sqs://queue-name', region="us-east1-b", green=False)
 tq = TaskQueue('fq:///path/to/queue/directory/') # file queue ('fq') 
 
 tq.insert(( PrintTask(i) for i in range(1000) )) # can use any iterable
+tq.enqueued # approximate number of tasks in the queue
+tq.inserted # fq only! total number of tasks inserted
+tq.completed # fq only! number of tasks completed, requires tally=True with poll
 ```
 
 This inserts 1000 PrintTask JSON descriptions into your SQS queue.
@@ -80,7 +83,11 @@ from taskqueue import TaskQueue
 import MY_MODULE # MY_MODULE contains the definitions of RegisteredTasks
 
 tq = TaskQueue('sqs://queue-name')
-tq.poll(lease_Seconds=int(LEASE_SECONDS))
+tq.poll(
+  lease_seconds=int(LEASE_SECONDS), 
+  verbose=True, # print out a success message
+  tally=True, # count number of tasks completed (fq only!)
+)
 ```
 
 Poll will check SQS for a new task periodically. If a task is found, it will execute it immediately, delete the task from the queue, and request another. If no task is found, a random exponential backoff of up to 60sec is built in to prevent workers from attempting to DDOS the queue. If the task fails to complete, the task will eventually recirculate within the SQS queue, ensuring that all tasks will eventually complete provided they are not fundementally flawed in some way.
