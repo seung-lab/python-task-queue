@@ -1,6 +1,8 @@
 import fcntl
+import functools
 import itertools
 import json
+import operator
 import os.path
 import random
 import re
@@ -149,6 +151,10 @@ class FileQueueAPI(object):
 
   @property
   def enqueued(self):
+    return len(self)
+
+  @property
+  def inserted(self):
     try:
       return int(read_file(self.insertions_path))
     except FileNotFoundError:
@@ -284,7 +290,7 @@ class FileQueueAPI(object):
 
     leasable_files = []
 
-    for batch in sip(files, 100):
+    for batch in sip(files, 250):
       random.shuffle(batch)
 
       for timestamp, filename in batch:
@@ -369,7 +375,7 @@ class FileQueueAPI(object):
     return ( read(f.path) for f in os.scandir(self.queue_path) )
 
   def __len__(self):
-    return itertools.count(iter(self))
+    return functools.reduce(operator.add, ( 1 for f in os.scandir(self.queue_path) ), 0)
       
       
 

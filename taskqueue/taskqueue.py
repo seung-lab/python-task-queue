@@ -114,6 +114,10 @@ class TaskQueue(object):
     return self.api.enqueued
 
   @property
+  def inserted(self):
+    return self.api.inserted
+
+  @property
   def completed(self):
     return self.api.completed
 

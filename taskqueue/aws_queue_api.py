@@ -47,6 +47,10 @@ class AWSTaskQueueAPI(object):
     return int(status['ApproximateNumberOfMessages']) + int(status['ApproximateNumberOfMessagesNotVisible'])
 
   @property
+  def inserted(self):
+    raise NotImplementedError()
+
+  @property
   def completed(self):
     raise NotImplementedError()
 
