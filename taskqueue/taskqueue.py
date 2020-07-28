@@ -246,7 +246,7 @@ class TaskQueue(object):
   def poll(
     self, lease_seconds=LEASE_SECONDS,  
     verbose=False, execute_args=[], execute_kwargs={}, 
-    stop_fn=None, backoff_exceptions=[], min_backoff_window=30, 
+    stop_fn=None, backoff_exceptions=[], min_backoff_window=1, 
     max_backoff_window=120, before_fn=None, after_fn=None,
     tally=False
   ):
