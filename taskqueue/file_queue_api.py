@@ -17,7 +17,7 @@ from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip, toabs
 
 retry = tenacity.retry(
   reraise=True, 
-  stop=tenacity.stop_after_attempt(7), 
+  stop=tenacity.stop_after_attempt(4), 
   wait=tenacity.wait_random_exponential(0.5, 60.0),
 )
 
