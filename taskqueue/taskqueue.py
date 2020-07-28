@@ -179,25 +179,6 @@ class TaskQueue(object):
     """For backwards compatibility."""
     return self.insert(*args, **kwargs)
 
-  def _gen_insert_all_tasks(
-      self, tasks, 
-      batch_size=AWS_BATCH_SIZE, 
-      delay_seconds=0, 
-      total=None
-    ):
-    bodies = (
-      {
-        "payload": task.payload(),
-        "queueName": self.path.path,
-        "groupByTag": True,
-        "tag": task.__class__.__name__
-      } 
-
-      for task in tasks
-    )
-
-    return ( partial(self.api.insert, batch, delay_seconds) for batch in sip(bodies, batch_size) )
-
   def renew(self, task, seconds):
     """Update the duration of a task lease."""
     return self.api.renew_lease(task, seconds)
