@@ -155,17 +155,14 @@ class TaskQueue(object):
       for task in tasks
     )
 
-    ct = [ 0 ]
+    ct = [ 0 ] # using a list instead of a raw number to use pass-by-reference
     ct_lock = threading.Lock()
     def insertfn(batch, ct):
-      # print("hi" + str(ct))
       try:
         incr = self.api.insert(batch, delay_seconds) 
       finally:
         with ct_lock:
           ct[0] += incr
-      # print("bye" + str(ct))
-    # print(total)
     
     schedule_jobs(
       fns=( partial(insertfn, batch, ct) for batch in sip(bodies, batch_size) ),
