@@ -99,6 +99,16 @@ By default, the Python task queue libraries are single threaded and blocking, re
 
 Attaining the quoted upload rates is simple but takes a few tricks to tune the queue. By default, TaskQueue will upload hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage.
 
+
+```python 
+# Listing 1: 10-100s per second, high memory usage, non-zero latency
+
+tasks = [ PrintTask(i) for i in range(1000000) ]
+tq = TaskQueue('sqs://queue-name')
+for task in tasks:
+  tq.insert(task)
+```
+
 ```python 
 # Listing 1: 100-1000s per second, high memory usage, non-zero latency
 

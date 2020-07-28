@@ -8,7 +8,7 @@ import botocore.errorfactory
 from .lib import toiter, sip
 from .secrets import aws_credentials
 
-AWS_BATCH_SIZE = 10 
+AWS_BATCH_SIZE = 10 # send_message_batch's max batch size is 10
 
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):
@@ -46,6 +46,10 @@ class AWSTaskQueueAPI(object):
     status = self.status()
     return int(status['ApproximateNumberOfMessages']) + int(status['ApproximateNumberOfMessagesNotVisible'])
 
+  @property
+  def completed(self):
+    raise NotImplementedError()
+
   def is_empty():
     return self.enqueued == 0
 
@@ -59,12 +63,9 @@ class AWSTaskQueueAPI(object):
   def insert(self, tasks, delay_seconds=0):
     tasks = toiter(tasks)
 
-    AWS_BATCH_SIZE = 10 
-
-    resps = []
-    batch = []
-
-    for batch in sip(tasks, AWS_BATCH_SIZE):
+    total = 0
+    # send_message_batch's max batch size is 10
+    for batch in sip(tasks, self.batch_size):
       if len(batch) == 0:
         break
 
@@ -76,9 +77,12 @@ class AWSTaskQueueAPI(object):
           "DelaySeconds": delay_seconds,
         } for j, task in enumerate(batch) ],
       )
-      resps.append(resp)
+      total += 1
 
-    return resps
+    return total
+
+  def add_insert_count(self, ct):
+    pass
 
   def renew_lease(self, seconds):
     raise NotImplementedError() 
@@ -131,6 +135,9 @@ class AWSTaskQueueAPI(object):
       )
     except botocore.exceptions.ClientError as err:
       pass
+
+  def tally(self):
+    raise NotImplementedError("Not supported for SQS.")
 
   def purge(self):
     # This is more efficient, but it kept freezing

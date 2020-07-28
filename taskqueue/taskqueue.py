@@ -8,8 +8,10 @@ import json
 import math
 import random
 import signal
+import threading
 import time
 import traceback
+
 
 import gevent.pool
 import multiprocessing as mp
@@ -111,6 +113,10 @@ class TaskQueue(object):
     """
     return self.api.enqueued
 
+  @property
+  def completed(self):
+    return self.api.completed
+
   def is_empty(self):
     return self.api.is_empty()
 
@@ -141,16 +147,36 @@ class TaskQueue(object):
     except:
       batch_size = 1
     
+    bodies = (
+      {
+        "payload": task.payload(),
+        "queueName": self.path.path,
+      } 
+      for task in tasks
+    )
+
+    ct = [ 0 ]
+    ct_lock = threading.Lock()
+    def insertfn(batch, ct):
+      # print("hi" + str(ct))
+      try:
+        incr = self.api.insert(batch, delay_seconds) 
+      finally:
+        with ct_lock:
+          ct[0] += incr
+      # print("bye" + str(ct))
+    # print(total)
+    
     schedule_jobs(
-      fns=self._gen_insert_all_tasks(
-        tasks, batch_size, delay_seconds, total
-      ),
+      fns=( partial(insertfn, batch, ct) for batch in sip(bodies, batch_size) ),
       concurrency=self.n_threads,
       progress='Inserting',
       total=total,
       green=self.green,
       batch_size=batch_size,
     )
+
+    self.api.add_insert_count(ct[0])
 
   def insert_all(self, *args, **kwargs):
     """For backwards compatibility."""
@@ -173,7 +199,7 @@ class TaskQueue(object):
       for task in tasks
     )
 
-    return ( partial(self.api.insert, batch, delay_seconds) for batch in sip(bodies, AWS_BATCH_SIZE) )
+    return ( partial(self.api.insert, batch, delay_seconds) for batch in sip(bodies, batch_size) )
 
   def renew(self, task, seconds):
     """Update the duration of a task lease."""
@@ -202,13 +228,15 @@ class TaskQueue(object):
     else:
       return [ totask(task) for task in tasks ]
 
-  def delete(self, task_id, total=None):
+  def delete(self, task_id, total=None, tally=False):
     """Deletes a task from a TaskQueue."""
     task_id = toiter(task_id)
     total = totalfn(task_id, total)
 
     def deltask(tid):
       self.api.delete(totaskid(tid))
+      if tally:
+        self.api.tally()
 
     schedule_jobs(
       fns=( partial(deltask, tid) for tid in task_id ),
@@ -234,17 +262,17 @@ class TaskQueue(object):
       return self
 
   def poll(
-    self, lease_seconds=LEASE_SECONDS, tag=None, 
+    self, lease_seconds=LEASE_SECONDS,  
     verbose=False, execute_args=[], execute_kwargs={}, 
     stop_fn=None, backoff_exceptions=[], min_backoff_window=30, 
-    max_backoff_window=120, before_fn=None, after_fn=None
+    max_backoff_window=120, before_fn=None, after_fn=None,
+    tally=False
   ):
     """
     Poll a queue until a stop condition is reached (default forever). Note
     that this function is not thread safe as it requires a global variable
     to intercept SIGINT.
     lease_seconds: each task should be leased for this many seconds
-    tag: if specified, query for only tasks that match this tag
     execute_args / execute_kwargs: pass these arguments to task execution
     backoff_exceptions: A list of exceptions that instead of causing a crash,
       instead cause the polling to back off for an increasing exponential 
@@ -255,10 +283,14 @@ class TaskQueue(object):
       in seconds.
     stop_fn: A boolean returning function that accepts no parameters. When
       it returns True, the task execution loop will terminate. It is evaluated
-      once after every task.
+      once after every task. If you provide the arguments `executed` (tasks completed) 
+      `tries` (current attempts at fetching a task), or `previous_execution_time` (time in
+      seconds to run the last task) they will be dependency injected.
     before_fn: Pass task pre-execution.
     after_fn: Pass task post-execution.
     verbose: print out the status of each step
+    tally: contribute each completed task to a completions counter if supported.
+
     Return: number of tasks executed
     """
     global LOOP
@@ -310,7 +342,7 @@ class TaskQueue(object):
         time_delta = time.time() - time_start
         executed += 1
         printv("Delete enqueued task...")
-        self.delete(task)
+        self.delete(task, tally=tally)
         printv('INFO', task , "succesfully executed in {:.2f} sec.".format(time_delta))
         after_fn(task)
         tries = 0
@@ -319,8 +351,17 @@ class TaskQueue(object):
       except Exception as e:
         printv('ERROR', task, "raised {}\n {}".format(e , traceback.format_exc()))
         raise # this will restart the container in kubernetes
-        
-      if stop_fn():
+      
+      varnames = stop_fn.__code__.co_varnames
+      stop_fn_bound = stop_fn
+      if 'executed' in varnames:
+        stop_fn_bound = partial(stop_fn_bound, executed=executed)
+      if 'tries' in varnames:
+        stop_fn_bound = partial(stop_fn_bound, tries=tries)
+      if 'previous_execution_time' in varnames:
+        stop_fn_bound = partial(stop_fn_bound, previous_execution_time=time_delta) 
+
+      if stop_fn_bound():
         break
 
       if backoff:

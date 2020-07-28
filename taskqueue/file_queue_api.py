@@ -29,9 +29,9 @@ def write_file(path, file, mode='wt'):
   with open(path, mode) as f:
     f.write(file)
 
-@retry
-def touch_file(path):
-  open(path, 'a').close()
+# @retry
+# def touch_file(path):
+#   open(path, 'a').close()
 
 @retry
 def move_file(src_path, dest_path):
@@ -143,11 +143,23 @@ class FileQueueAPI(object):
 
     self.movement_path = mkdir(os.path.join(path, 'movement'))
     self.queue_path = mkdir(os.path.join(path, 'queue'))
+    self.completions_path = os.path.join(path, 'completions')
+    self.insertions_path = os.path.join(path, 'insertions')
     self.batch_size = 10
 
   @property
   def enqueued(self):
-    return int(self.list())
+    try:
+      return int(read_file(self.insertions_path))
+    except FileNotFoundError:
+      return 0
+
+  @property
+  def completed(self):
+    try:
+      return os.path.getsize(self.completions_path)
+    except FileNotFoundError:
+      return 0
 
   @retry
   def insert(self, tasks, delay_seconds=0):
@@ -157,6 +169,7 @@ class FileQueueAPI(object):
     if delay_seconds > 0:
       timestamp = nowfn() + delay_seconds # unix timestamp
 
+    total = 0
     for task in tasks:
       identifier = str(uuid.uuid4())
       filename = "{}--{}.json".format(timestamp, identifier)
@@ -169,6 +182,19 @@ class FileQueueAPI(object):
         os.path.join(self.movement_path, identifier),
         filename + "\n"
       )
+      total += 1
+
+    return total
+
+  def add_insert_count(self, ct):
+    try:
+      N = int(read_file(self.insertions_path))
+    except FileNotFoundError:
+      N = 0
+
+    N += int(ct)
+    write_file(self.insertions_path, str(N))
+    return N
 
   @retry
   def renew_lease(self, task, seconds):
@@ -312,6 +338,11 @@ class FileQueueAPI(object):
       os.remove(movements_file_path)
     except FileNotFoundError:
       pass
+
+  def tally(self):
+    print(self.completions_path)
+    with open(self.completions_path, 'ba') as f:
+      f.write(b'\0')
 
   def purge(self):
     all_files = itertools.chain(
