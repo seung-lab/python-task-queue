@@ -340,7 +340,6 @@ class FileQueueAPI(object):
       pass
 
   def tally(self):
-    print(self.completions_path)
     with open(self.completions_path, 'ba') as f:
       f.write(b'\0')
 
