@@ -94,6 +94,10 @@ def idfn(task):
     ident = ident.split("--")[1]
   return os.path.splitext(ident)[0] # removes .json if present
 
+def get_timestamp(filename):
+  filename = os.path.basename(filename)
+  return int(filename.split("--")[0])
+
 def set_timestamp(filename, timestamp):
   old_timestamp, rest = filename.split('--')
   return "{}--{}".format(timestamp, rest)
@@ -249,6 +253,9 @@ class FileQueueAPI(object):
 
     now = nowfn()
     for file in os.scandir(self.queue_path):
+      if get_timestamp(file.name) < now:
+        continue
+
       move_file(
         os.path.join(self.queue_path, file.name),
         os.path.join(self.queue_path, set_timestamp(file.name, now))
