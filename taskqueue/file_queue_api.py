@@ -245,21 +245,21 @@ class FileQueueAPI(object):
 
   def release_all(self):
     """Voids all leases and sets all tasks to available."""
-    for file in os.scandir(self.movement_path):
-      try:
-        os.remove(file.path)
-      except FileNotFoundError:
-        pass   
-
     now = nowfn()
     for file in os.scandir(self.queue_path):
       if get_timestamp(file.name) < now:
         continue
 
+      new_filename = set_timestamp(file.name, now)
       move_file(
         os.path.join(self.queue_path, file.name),
-        os.path.join(self.queue_path, set_timestamp(file.name, now))
+        os.path.join(self.queue_path, new_filename)
       )
+
+      movement_path = os.path.join(self.movement_path, idfn(new_filename))
+      fd = write_lock_file(open(movement_path, 'at'))
+      fd.write(new_filename + "\n")
+      fd.close()
 
   @retry
   def _lease_filename(self, filename, seconds):
