@@ -190,6 +190,9 @@ class TaskQueue(object):
   def cancel(self, task):
     return self.api.cancel_lease(task)
 
+  def release_all(self):
+    return self.api.release_all()
+
   def lease(self, seconds=600, num_tasks=1):
     """
     Acquires a lease on the topmost N unowned tasks in the specified queue.
