@@ -94,6 +94,9 @@ class AWSTaskQueueAPI(object):
   def cancel_lease(self, rhandle):
     raise NotImplementedError()
 
+  def release_all(self):
+    raise NotImplementedError()
+
   def _request(self, num_tasks, visibility_timeout):
     resp = self._sqs.receive_message(
       QueueUrl=self._qurl,
