@@ -243,7 +243,7 @@ class FileQueueAPI(object):
     """Voids all leases and sets all tasks to available."""
     for file in os.scandir(self.movement_path):
       try:
-        os.remove(file.path, file.name)
+        os.remove(file.path)
       except FileNotFoundError:
         pass   
 
