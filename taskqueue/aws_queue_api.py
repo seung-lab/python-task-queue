@@ -20,21 +20,21 @@ class AWSTaskQueueAPI(object):
 
     if matches is not None:
       region_name, = matches.groups()
-      self._qurl = qurl
+      self.qurl = qurl
     else:
-      self._qurl = None
+      self.qurl = None
 
     credentials = aws_credentials()
    
-    self._sqs = boto3.client('sqs', 
+    self.sqs = boto3.client('sqs', 
       region_name=region_name, 
       aws_secret_access_key=credentials['AWS_SECRET_ACCESS_KEY'],
       aws_access_key_id=credentials['AWS_ACCESS_KEY_ID'],
     )    
 
-    if self._qurl is None:
+    if self.qurl is None:
       try:
-        self._qurl = self._sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
+        self.qurl = self.sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
       except Exception:
         print(qurl)
         raise
@@ -58,8 +58,8 @@ class AWSTaskQueueAPI(object):
     return self.enqueued == 0
 
   def status(self):
-    resp = self._sqs.get_queue_attributes(
-      QueueUrl=self._qurl, 
+    resp = self.sqs.get_queue_attributes(
+      QueueUrl=self.qurl, 
       AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
     )
     return resp['Attributes']
@@ -73,8 +73,8 @@ class AWSTaskQueueAPI(object):
       if len(batch) == 0:
         break
 
-      resp = self._sqs.send_message_batch(
-        QueueUrl=self._qurl,
+      resp = self.sqs.send_message_batch(
+        QueueUrl=self.qurl,
         Entries=[ {
           "Id": str(j),
           "MessageBody": json.dumps(task),
@@ -101,8 +101,8 @@ class AWSTaskQueueAPI(object):
     raise NotImplementedError()
 
   def _request(self, num_tasks, visibility_timeout):
-    resp = self._sqs.receive_message(
-      QueueUrl=self._qurl,
+    resp = self.sqs.receive_message(
+      QueueUrl=self.qurl,
       AttributeNames=[
         'SentTimestamp'
       ],
@@ -139,8 +139,8 @@ class AWSTaskQueueAPI(object):
         rhandle = task['id']
 
     try:
-      self._sqs.delete_message(
-        QueueUrl=self._qurl,
+      self.sqs.delete_message(
+        QueueUrl=self.qurl,
         ReceiptHandle=rhandle,
       )
     except botocore.exceptions.ClientError as err:
@@ -152,7 +152,7 @@ class AWSTaskQueueAPI(object):
   def purge(self):
     # This is more efficient, but it kept freezing
     # try:
-    #     self._sqs.purge_queue(QueueUrl=self._qurl)
+    #     self.sqs.purge_queue(QueueUrl=self.qurl)
     # except botocore.errorfactory.PurgeQueueInProgress:
 
     while self.enqueued:
