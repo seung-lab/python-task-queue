@@ -22,14 +22,28 @@ retry = tenacity.retry(
 )
 
 @retry
-def read_file(path, mode='rt'):
-  with open(path, mode) as f:
-    return f.read()
+def read_file(path, mode='rt', lock=False, block=False):
+  f = open(path, mode)
+  if lock:
+    f = read_lock_file(f)
+  data = f.read()
+  f.close()
+  return data
 
 @retry
-def write_file(path, file, mode='wt'):
-  with open(path, mode) as f:
-    f.write(file)
+def write_file(
+  path, file, mode='wt', 
+  fsync=False, lock=False, 
+  block=False
+):
+  f = open(path, mode)
+  if lock:
+    f = write_lock_file(f, block=block)
+  f.write(file)
+  if fsync:
+    f.flush() # from application buffers -> OS buffers
+    os.fsync(f.fileno()) # OS buffers -> disk
+  f.close()
 
 # @retry
 # def touch_file(path):
@@ -40,7 +54,7 @@ def move_file(src_path, dest_path):
   os.rename(src_path, dest_path)
 
 @retry
-def write_lock_file(fd):
+def write_lock_file(fd, block=False):
   """
   Locks are bound to processes. A terminated process unlocks. 
   Non-blocking, raises OSError if unable to obtain a lock.
@@ -54,12 +68,15 @@ def write_lock_file(fd):
   # "On at least some systems, LOCK_EX can only be used if the file 
   # descriptor refers to a file opened for writing."
   # Locks: LOCK_EX (exclusive), LOCK_SH (shared), LOCK_NB (non-blocking)
+  mode = fcntl.LOCK_EX
+  if not block:
+    mode |= fcntl.LOCK_NB
 
-  fcntl.lockf(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+  fcntl.lockf(fd.fileno(), mode)
   return fd
 
 @retry
-def read_lock_file(fd):
+def read_lock_file(fd, block=False):
   """
   Locks are bound to processes. A terminated process unlocks. 
   Non-blocking, raises OSError if unable to obtain a lock.
@@ -73,12 +90,15 @@ def read_lock_file(fd):
   # "On at least some systems, LOCK_EX can only be used if the file 
   # descriptor refers to a file opened for writing."
   # Locks: LOCK_EX (exclusive), LOCK_SH (shared), LOCK_NB (non-blocking)
+  mode = fcntl.LOCK_SH
+  if not block:
+    mode |= fcntl.LOCK_NB
 
-  fcntl.lockf(fd.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+  fcntl.lockf(fd.fileno(), mode)
   return fd
 
 def unlock_file(fd):
-  fcntl.lockf(fd, fcntl.LOCK_UN)
+  fcntl.lockf(fd.fileno(), fcntl.LOCK_UN)
   return fd
 
 def idfn(task):
@@ -203,8 +223,14 @@ class FileQueueAPI(object):
       N = 0
 
     N += int(ct)
-    write_file(self.insertions_path, str(N))
+    write_file(self.insertions_path, str(N), fsync=True, lock=True, block=True)
     return N
+
+  @retry
+  def rezero(self):
+    # no sense acquiring a lock for completions since other writers aren't 
+    write_file(self.completions_path, b'', mode='bw+', fsync=True) 
+    write_file(self.insertions_path, '0', mode='tw+', fsync=True, lock=True, block=True)
 
   @retry
   def renew_lease(self, task, seconds):

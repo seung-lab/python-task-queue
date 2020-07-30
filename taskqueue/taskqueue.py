@@ -183,6 +183,10 @@ class TaskQueue(object):
     """For backwards compatibility."""
     return self.insert(*args, **kwargs)
 
+  def rezero(self):
+    """Resets statistic counters such as completions and insertions to zero."""
+    self.api.rezero()
+
   def renew(self, task, seconds):
     """Update the duration of a task lease."""
     return self.api.renew_lease(task, seconds)

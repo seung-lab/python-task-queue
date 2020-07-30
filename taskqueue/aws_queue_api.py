@@ -88,6 +88,9 @@ class AWSTaskQueueAPI(object):
   def add_insert_count(self, ct):
     pass
 
+  def rezero(self):
+    pass
+
   def renew_lease(self, seconds):
     raise NotImplementedError() 
 
