@@ -90,7 +90,15 @@ tq.poll(
 )
 ```
 
-Poll will check SQS for a new task periodically. If a task is found, it will execute it immediately, delete the task from the queue, and request another. If no task is found, a random exponential backoff of up to 60sec is built in to prevent workers from attempting to DDOS the queue. If the task fails to complete, the task will eventually recirculate within the SQS queue, ensuring that all tasks will eventually complete provided they are not fundementally flawed in some way.
+Poll will check the queue for a new task periodically. If a task is found, it will execute it immediately, delete the task from the queue, and request another. If no task is found, a random exponential backoff of up to 120sec is built in to prevent workers from attempting to DDOS the queue. If the task fails to complete, the task will eventually recirculate within the queue, ensuring that all tasks will eventually complete provided they are not fundementally flawed in some way.
+
+### Notes on File Queue
+
+FileQueue (`fq://`) is designed to simulate the timed task leasing feature from SQS and exploits a common filesystem to avoid requiring an additional queue server. You can read in detail about its design [on the wiki](https://github.com/seung-lab/python-task-queue/wiki/FileQueue-Design).  
+
+There are a few things FileQueue can do that SQS can't and also some quirks you should be aware of. For one, FileQueue can track the number of task completions (`tq.completions`, `tq.poll(..., tally=True)`), but it does so by appending a byte to a file called `completions` for each completion. The size of the file in bytes is the number of completions. This design is an attempt to avoid problems with locking and race conditions. FileQueue also tracks insertions (`tq.insertions`) in a more typical way in an `insertions` file.
+
+FileQueue also allows releasing all current tasks from their leases, something impossible in SQS. Sometimes a few tasks will die immediately after leasing, but with a long lease, and you'll figure out how to fix them. Instead of starting over or waiting possibly hours, you can set the queue to be made available again (`tq.release_all()`).
 
 ## Motivation
 
@@ -104,11 +112,10 @@ By default, the Python task queue libraries are single threaded and blocking, re
 
 ## How to Achieve High Performance
 
-Attaining the quoted upload rates is simple but takes a few tricks to tune the queue. By default, TaskQueue will upload hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage.
-
+Attaining the quoted upload rates is simple but takes a few tricks to tune the queue. By default, TaskQueue will upload hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage. Note that the examples below use `sqs://`, but apply to `fq://` as well.
 
 ```python 
-# Listing 1: 10-100s per second, high memory usage, non-zero latency
+# Listing 1: 10s per second, high memory usage, non-zero latency
 
 tasks = [ PrintTask(i) for i in range(1000000) ]
 tq = TaskQueue('sqs://queue-name')
@@ -116,8 +123,10 @@ for task in tasks:
   tq.insert(task)
 ```
 
+This first example shows how you might use the queue in the most naive fashion. The tasks list takes a long time to compute, uses a lot of memory, and then inserts a single task at a time, failing to exploit the threading model in TaskQueue. **Note that this behavior has changed from previous versions where we endorsed the "with" statement where this form was faster, though still problematic.**
+
 ```python 
-# Listing 1: 100-1000s per second, high memory usage, non-zero latency
+# Listing 2: 100-1000s per second, high memory usage, non-zero latency
 
 tasks = [ PrintTask(i) for i in range(1000000) ]
 tq = TaskQueue('sqs://queue-name')
@@ -126,42 +135,22 @@ tq.insert(tasks)
 
 The listing above allows you to use ordinary iterative programming techniques to achieve an upload rate of hundreds per a second without much configuration, a marked improvement over simply using boto nakedly. However, the initial generation of a list of tasks uses a lot of memory and introduces a delay while the list is generated. 
 
+This form also takes advantage of SQS batch upload which allows for submitting 10 tasks at once. As the overhead for submitting a task lies mainly in HTTP/1.1 TCP/IP connection overhead, batching 10 requests results in nearly a 10x improvement in performance. However, in this case we've created all the tasks up front again in order to batch them correctly which results in the same memory and latency issues as in Listing 1. 
+
 ```python 
-# Listing 2: 100-1000s per second, low memory usage, near-zero latency
+# Listing 3: 100-1000s per second, low memory usage, near-zero latency
 
 tasks = ( PrintTask(i) for i in range(1000000) )
 tq = TaskQueue('sqs://queue-name')
-tq.insert(tasks)
+tq.insert(tasks, total=1000000) # total necessary for progress bars to work
 ``` 
 
-Listing 2 generates tasks and begins uploading them simultaneously. Initially, this results in low memory usage, but sometimes task generation begins to outpace uploading and causes memory usage to grow. Regardless, upload begins immediately so no latency is introduced. 
-
-
-```python 
-# Listing 3: 100-1000s per second, high memory usage, non-zero latency
-
-tasks = [ PrintTask(i) for i in range(1000000) ]
-with TaskQueue('sqs-queue-name') as tq:
-  tq.insert_all(tasks)
-```
-
-Listing 3 takes advantage of SQS batch upload which allows for submitting 10 tasks at once. As the overhead for submitting a task lies mainly in HTTP/1.1 TCP/IP connection overhead, batching 10 requests results in nearly a 10x improvement in performance. However, in this case we've created all the tasks up front again in order to batch them correctly which results in the same memory and latency issues as in Listing 1. 
-
-
-```python 
-# Listing 4: 100s-1000s per second, low memory usage, near-zero latency 
-
-tasks = ( PrintTask(i) for i in range(1000000) ) 
-with TaskQueue('sqs://queue-name') as tq:
-  tq.insert_all(tasks, total=(end - start))
-```
-
-In Listing 4, we've started using generators instead of lists. Generators are essentially lazy-lists that compute the next list element on demand. Defining a generator is fast and takes constant time, so we are able to begin production of new elements nearly instantly. The elements are produced on demand and consumed instantly, resulting in a small constant memory overhead that can be typically measured in kilobytes to megabytes.  
+In Listing 3, we've started using generators instead of lists. Generators are essentially lazy-lists that compute the next list element on demand. Defining a generator is fast and takes constant time, so we are able to begin production of new elements nearly instantly. The elements are produced on demand and consumed instantly, resulting in a small constant memory overhead that can be typically measured in kilobytes to megabytes.  
 
 As generators do not support the `len` operator, we manually pass in the number of items to display a progress bar.
 
 ```python 
-# Listing 5: 100s-1000s per second, low memory usage, near-zero latency
+# Listing 4: 100s-1000s per second, low memory usage, near-zero latency
 
 import gevent.monkey 
 gevent.monkey.patch_all()
@@ -172,12 +161,12 @@ tq = TaskQueue('sqs://queue-name', green=True)
 tq.insert(tasks, total=1000000) # total helps the progress bar
 ```
 
-In Listing 5, we replace TaskQueue with GreenTaskQueue. Under the hood, TaskQueue relies on Python kernel threads to achieve concurrent IO. However, on systems with mutliple cores, especially those in a virutalized or NUMA context, the OS will tend to distribute the threads fairly evenly between cores leading to high context-switching overhead. Ironically, a more powerful multicore system can lead to lower performance. To remedy this issue, we introduce a user-space cooperative threading model (green threads) using gevent (which depending on your system is uses either libev or libuv for an event loop).  
+In Listing 4, we use the `green=True` argument to use cooperative threads. Under the hood, TaskQueue relies on Python kernel threads to achieve concurrent IO. However, on systems with mutliple cores, especially those in a virutalized or NUMA context, the OS will tend to distribute the threads fairly evenly between cores leading to high context-switching overhead. Ironically, a more powerful multicore system can lead to lower performance. To remedy this issue, we introduce a user-space cooperative threading model (green threads) using gevent (which depending on your system is uses either libev or libuv for an event loop).  
 
 This can result in a substantial performance increase on some systems. Typically a single core will be fully utilized with extremely low overhead. However, using cooperative threading with networked IO in Python requires monkey patching the standard library (!!). Refusing to patch the standard library will result in single threaded performance. Thus, using GreenTaskQueue can introduce problems into many larger applications (we've seen problems with multiprocessing and ipython). However, often the task upload script can be isolated from the rest of the system and this allows monkey patching to be safely performed. To give users more control over when they wish to accept the risk of monkey patching, it is not performed automatically and a warning will appear with instructions for amending your program.  
 
 ```python 
-# Listing 6: 1000s-10000 per second, low memory usage, near zero latency, efficient multiprocessing
+# Listing 5: 1000s-10000 per second, low memory usage, near zero latency, efficient multiprocessing
 
 import gevent.monkey 
 gevent.monkey.patch_all()
@@ -195,7 +184,7 @@ with ProcessPoolExecutor(max_workers=4) as pool:
   pool.map(upload, task_ranges)
 ``` 
 
-In Listing 6, we finally move to multiprocessing to attain the highest speeds. There are three critical pieces of this construction to note.   
+In Listing 5, we finally move to multiprocessing to attain the highest speeds. There are three critical pieces of this construction to note.   
 
 First, we do not use the usual `multiprocessing` package and instead use `concurrent.futures.ProcessPoolExecutor`. If a child process dies in `multiprocessing`, the parent process will simply hang (this is by design unfortunately...). Using this alternative package, at least an exception will be thrown.  
 
@@ -204,7 +193,7 @@ Second, we pass parameters for task generation to the child proceses, not tasks.
 Third, as described in the narrative for Listing 5, the GreenTaskQueue has less context-switching overhead than ordinary multithreaded TaskQueue. Using GreenTaskQueue will cause each core to efficiently run independently of the others. At this point, your main bottlenecks will probably be OS/network card related (let us know if they aren't!). Multiprocessing does scale task production, but it's sub-linear in the number of processes. The task upload rate per a process will fall with each additional core added, but each core still adds additional throughput up to some inflection point.
 
 ```python 
-# Listing 7: Exchanging Generators for Iterators
+# Listing 6: Exchanging Generators for Iterators
 
 import gevent.monkey 
 gevent.monkey.patch_all()
@@ -233,7 +222,7 @@ with ProcessPoolExecutor(max_workers=2) as execute:
 If you insist on wanting to pass generators to your subprocesses, you can use iterators instead. The construction above allows us to write the generator call up front, pass only a few primatives through the pickling process, and transparently call the generator on the other side. We can even support the `len()` function which is not available for generators.
 
 ```python
-# Listing 8: Easy Multiprocessing
+# Listing 7: Easy Multiprocessing
 
 import gevent.monkey 
 gevent.monkey.patch_all(thread=False)
