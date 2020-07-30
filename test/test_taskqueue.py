@@ -2,6 +2,8 @@ import json
 import os
 import time
 
+from moto import mock_sqs
+
 from six.moves import range
 import pytest
 
@@ -9,20 +11,27 @@ import taskqueue
 from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 from taskqueue.paths import ExtractedPath, mkpath
 
-TRAVIS_BRANCH = None if 'TRAVIS_BRANCH' not in os.environ else os.environ['TRAVIS_BRANCH']
 
-if TRAVIS_BRANCH is None:
-  QURL = 'test-pull-queue'
-elif TRAVIS_BRANCH == 'master':
-  QURL = 'travis-pull-queue-1'
-else:
-  QURL = 'travis-pull-queue-2'
+@pytest.fixture(scope='function')
+def aws_credentials():
+  """Mocked AWS Credentials for moto."""
+  os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
+  os.environ['AWS_SECRET_ACCESS_KEY'] = 'testing'
+  os.environ['AWS_SECURITY_TOKEN'] = 'testing'
+  os.environ['AWS_SESSION_TOKEN'] = 'testing'
+  os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
-FILE_QURL = '/tmp/removeme/taskqueue/fq'
+@pytest.fixture(scope='function')
+def sqs(aws_credentials):
+  with mock_sqs():
+    import boto3
+    client = boto3.client('sqs')
+    client.create_queue(QueueName='test-pull-queue')
+    yield client
 
 QURLS = {
-  'sqs': QURL,
-  'fq': FILE_QURL,
+  'sqs': 'test-pull-queue',
+  'fq': '/tmp/removeme/taskqueue/fq',
 }
 
 PROTOCOL = ('fq', 'sqs')
@@ -57,7 +66,7 @@ def test_task_creation():
   }
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
-def test_get(protocol):
+def test_get(sqs, protocol):
   path = getpath(protocol) 
   tq = TaskQueue(path, n_threads=0)
 
@@ -70,7 +79,7 @@ def test_get(protocol):
     tq.delete(t)
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
-def test_single_threaded_insertion(protocol):
+def test_single_threaded_insertion(sqs, protocol):
   path = getpath(protocol) 
   tq = TaskQueue(path, n_threads=0)
 
@@ -86,7 +95,7 @@ def test_single_threaded_insertion(protocol):
 @pytest.mark.parametrize('protocol', PROTOCOL)
 @pytest.mark.parametrize('green', (True, False))
 @pytest.mark.parametrize('threads', (1, 2, 10, 20, 40))
-def test_multi_threaded_insertion(protocol, green, threads):
+def test_multi_threaded_insertion(sqs, protocol, green, threads):
   path = getpath(protocol) 
 
   tq = TaskQueue(path, n_threads=threads, green=green)
@@ -116,35 +125,9 @@ def test_multi_threaded_insertion(protocol, green, threads):
 #     with TaskQueue(QURL) as tq:
 #       tq.purge()
 
-def test_renew():
-  path = getpath('fq')
-  tq = TaskQueue(path)
-  tq.purge()
-
-  tq.insert(PrintTask('hello'))
-
-  ts = lambda fname: int(fname.split('--')[0])
-  ident = lambda fname: fname.split('--')[1]
-
-  filenames = os.listdir(tq.api.queue_path)
-  assert len(filenames) == 1
-  filename = filenames[0]
-
-  assert ts(filename) == 0
-  identity = ident(filename)
-
-  now = time.time()
-  tq.renew(filename, 1)
-
-  filenames = os.listdir(tq.api.queue_path)
-  assert len(filenames) == 1
-  filename = filenames[0]
-  print(filename)
-  assert ts(filename) >= int(time.time()) + 1
-  assert ident(filename) == identity
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
-def test_400_errors(protocol):
+def test_400_errors(sqs, protocol):
   path = getpath(protocol) 
 
   tq = TaskQueue(path, n_threads=0)
@@ -168,7 +151,7 @@ def test_local_taskqueue():
   tq.insert(epts)
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
-def test_parallel_insert_all(protocol):
+def test_parallel_insert_all(sqs, protocol):
   import pathos_issue
 
   path = getpath(protocol) 

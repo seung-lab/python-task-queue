@@ -54,3 +54,28 @@ def test_count_insertions():
 
   tq.purge()
 
+def test_renew():
+  tq = TaskQueue(FILE_QURL)
+  tq.purge()
+
+  tq.insert(PrintTask('hello'))
+
+  ts = lambda fname: int(fname.split('--')[0])
+  ident = lambda fname: fname.split('--')[1]
+
+  filenames = os.listdir(tq.api.queue_path)
+  assert len(filenames) == 1
+  filename = filenames[0]
+
+  assert ts(filename) == 0
+  identity = ident(filename)
+
+  now = time.time()
+  tq.renew(filename, 1)
+
+  filenames = os.listdir(tq.api.queue_path)
+  assert len(filenames) == 1
+  filename = filenames[0]
+
+  assert ts(filename) >= int(time.time()) + 1
+  assert ident(filename) == identity

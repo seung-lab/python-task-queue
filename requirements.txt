@@ -4,7 +4,6 @@ google-auth>=1.10.0
 google-cloud-core>=1.1.0
 numpy>=1.13.1
 pathos
-pytest>=3.3.1
 pbr
 tenacity
 tqdm
