@@ -1,6 +1,16 @@
 CHANGES
 =======
 
+* test: fix travis
+* fix: support py27 with scandir pkg
+* feat: FileQueue + big redesign of TaskQueue (#24)
+
+1.0.0
+-----
+
+* release(1.0.0): add before\_fn and after\_fn to poll
+* redesign(BREAKING): replace useless log\_fn with before\_fn and after\_fn (#21)
+
 0.15.0
 ------
 
