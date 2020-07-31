@@ -4,4 +4,4 @@ from .taskqueue import (
   multiprocess_upload, QueueEmptyError, totask
 )
 
-__version__ = '1.0.0'
+__version__ = '2.0.0'
