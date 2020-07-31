@@ -1,11 +1,7 @@
 from .registered_task import RegisteredTask, MockTask, PrintTask
 from .taskqueue import (
-  TaskQueue, GreenTaskQueue, MockTaskQueue, LocalTaskQueue, 
-  multiprocess_upload, QueueEmpty, totask
-)
-from .secrets import (
-  QUEUE_NAME, TEST_QUEUE_NAME, QUEUE_TYPE, 
-  PROJECT_NAME, AWS_DEFAULT_REGION
+  TaskQueue, MockTaskQueue, GreenTaskQueue, LocalTaskQueue, 
+  multiprocess_upload, QueueEmptyError, totask
 )
 
 __version__ = '1.0.0'

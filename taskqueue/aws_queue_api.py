@@ -3,20 +3,12 @@ import re
 import types
 
 import boto3
-import botocore
+import botocore.errorfactory
 
+from .lib import toiter, sip
 from .secrets import aws_credentials
 
-def toiter(obj):
-  if isinstance(obj, types.GeneratorType):
-    return obj
-
-  try:
-    if type(obj) is dict:
-      return iter([ obj ])
-    return iter(obj)
-  except TypeError:
-    return iter([ obj ])
+AWS_BATCH_SIZE = 10 # send_message_batch's max batch size is 10
 
 class AWSTaskQueueAPI(object):
   def __init__(self, qurl, region_name=None):
@@ -28,29 +20,46 @@ class AWSTaskQueueAPI(object):
 
     if matches is not None:
       region_name, = matches.groups()
-      self._qurl = qurl
+      self.qurl = qurl
     else:
-      self._qurl = None
+      self.qurl = None
 
     credentials = aws_credentials()
    
-    self._sqs = boto3.client('sqs', 
+    self.sqs = boto3.client('sqs', 
       region_name=region_name, 
       aws_secret_access_key=credentials['AWS_SECRET_ACCESS_KEY'],
       aws_access_key_id=credentials['AWS_ACCESS_KEY_ID'],
     )    
 
-    if self._qurl is None:
-      self._qurl = self._sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
+    if self.qurl is None:
+      try:
+        self.qurl = self.sqs.get_queue_url(QueueName=qurl)["QueueUrl"]
+      except Exception:
+        print(qurl)
+        raise
+
+    self.batch_size = AWS_BATCH_SIZE
 
   @property
   def enqueued(self):
     status = self.status()
     return int(status['ApproximateNumberOfMessages']) + int(status['ApproximateNumberOfMessagesNotVisible'])
 
+  @property
+  def inserted(self):
+    raise NotImplementedError()
+
+  @property
+  def completed(self):
+    raise NotImplementedError()
+
+  def is_empty():
+    return self.enqueued == 0
+
   def status(self):
-    resp = self._sqs.get_queue_attributes(
-      QueueUrl=self._qurl, 
+    resp = self.sqs.get_queue_attributes(
+      QueueUrl=self.qurl, 
       AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
     )
     return resp['Attributes']
@@ -58,32 +67,29 @@ class AWSTaskQueueAPI(object):
   def insert(self, tasks, delay_seconds=0):
     tasks = toiter(tasks)
 
-    AWS_BATCH_SIZE = 10 
-
-    resps = []
-    batch = []
-    while True:
-      del batch[:]
-      try:
-        for i in range(10):
-          batch.append(next(tasks))
-      except StopIteration:
-        pass
-      
+    total = 0
+    # send_message_batch's max batch size is 10
+    for batch in sip(tasks, self.batch_size):
       if len(batch) == 0:
         break
 
-      resp = self._sqs.send_message_batch(
-        QueueUrl=self._qurl,
+      resp = self.sqs.send_message_batch(
+        QueueUrl=self.qurl,
         Entries=[ {
           "Id": str(j),
           "MessageBody": json.dumps(task),
           "DelaySeconds": delay_seconds,
         } for j, task in enumerate(batch) ],
       )
-      resps.append(resp)
+      total += 1
 
-    return resps
+    return total
+
+  def add_insert_count(self, ct):
+    pass
+
+  def rezero(self):
+    pass
 
   def renew_lease(self, seconds):
     raise NotImplementedError() 
@@ -91,9 +97,12 @@ class AWSTaskQueueAPI(object):
   def cancel_lease(self, rhandle):
     raise NotImplementedError()
 
+  def release_all(self):
+    raise NotImplementedError()
+
   def _request(self, num_tasks, visibility_timeout):
-    resp = self._sqs.receive_message(
-      QueueUrl=self._qurl,
+    resp = self.sqs.receive_message(
+      QueueUrl=self.qurl,
       AttributeNames=[
         'SentTimestamp'
       ],
@@ -115,13 +124,10 @@ class AWSTaskQueueAPI(object):
       tasks.append(task)
     return tasks
 
-  def lease(self, seconds, numTasks=1, groupByTag=False, tag=''):
-    if numTasks > 1:
-      raise ValueError("This library (not boto/SQS) only supports fetching one task at a time. Requested: {}.".format(numTasks))
-    return self._request(numTasks, seconds)
-
-  def acknowledge(self, task):
-    return self.delete(task)
+  def lease(self, seconds, num_tasks=1):
+    if num_tasks > 1:
+      raise ValueError("This library (not boto/SQS) only supports fetching one task at a time. Requested: {}.".format(num_tasks))
+    return self._request(num_tasks, seconds)
 
   def delete(self, task):
     if type(task) == str:
@@ -133,17 +139,20 @@ class AWSTaskQueueAPI(object):
         rhandle = task['id']
 
     try:
-      self._sqs.delete_message(
-        QueueUrl=self._qurl,
+      self.sqs.delete_message(
+        QueueUrl=self.qurl,
         ReceiptHandle=rhandle,
       )
     except botocore.exceptions.ClientError as err:
       pass
 
+  def tally(self):
+    raise NotImplementedError("Not supported for SQS.")
+
   def purge(self):
     # This is more efficient, but it kept freezing
     # try:
-    #     self._sqs.purge_queue(QueueUrl=self._qurl)
+    #     self.sqs.purge_queue(QueueUrl=self.qurl)
     # except botocore.errorfactory.PurgeQueueInProgress:
 
     while self.enqueued:
@@ -154,8 +163,10 @@ class AWSTaskQueueAPI(object):
     return self
 
   def list(self):
-    return self._request(num_tasks=10, visibility_timeout=0)
-      
+    return list(self)
+    
+  def __iter__(self):
+    return iter(self._request(num_tasks=10, visibility_timeout=0))
       
 
 

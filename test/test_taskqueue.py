@@ -2,28 +2,44 @@ import json
 import os
 import time
 
+from moto import mock_sqs
+
 from six.moves import range
 import pytest
 
 import taskqueue
-from taskqueue import RegisteredTask, GreenTaskQueue, TaskQueue, MockTask, PrintTask, LocalTaskQueue, MockTaskQueue
-from taskqueue import QUEUE_NAME
-
-TRAVIS_BRANCH = None if 'TRAVIS_BRANCH' not in os.environ else os.environ['TRAVIS_BRANCH']
-
-if QUEUE_NAME != '':
-  pass
-elif TRAVIS_BRANCH is None:
-  QUEUE_NAME = 'test-pull-queue'
-elif TRAVIS_BRANCH == 'master':
-  QUEUE_NAME = 'travis-pull-queue-1'
-else:
-  QUEUE_NAME = 'travis-pull-queue-2'
+from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
+from taskqueue.paths import ExtractedPath, mkpath
 
 
-QTYPES = ('aws',)#, 'google')
+@pytest.fixture(scope='function')
+def aws_credentials():
+  """Mocked AWS Credentials for moto."""
+  os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
+  os.environ['AWS_SECRET_ACCESS_KEY'] = 'testing'
+  os.environ['AWS_SECURITY_TOKEN'] = 'testing'
+  os.environ['AWS_SESSION_TOKEN'] = 'testing'
+  os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
-QURL = 'test-pull-queue'
+@pytest.fixture(scope='function')
+def sqs(aws_credentials):
+  with mock_sqs():
+    import boto3
+    client = boto3.client('sqs')
+    client.create_queue(QueueName='test-pull-queue')
+    yield client
+
+QURLS = {
+  'sqs': 'test-pull-queue',
+  'fq': '/tmp/removeme/taskqueue/fq',
+}
+
+PROTOCOL = ('fq', 'sqs')
+
+def getpath(protocol):
+  global QURLS
+  qurl = QURLS[protocol]
+  return mkpath(ExtractedPath(protocol, qurl))
 
 class ExecutePrintTask(RegisteredTask):
   def __init__(self):
@@ -32,7 +48,6 @@ class ExecutePrintTask(RegisteredTask):
   def execute(self, wow, wow2):
     print(wow + wow2)
     return wow + wow2
-
 
 def test_task_creation():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
@@ -50,56 +65,45 @@ def test_task_creation():
       "with_kwargs": None
   }
 
-def test_get():
-  global QUEUE_NAME
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_get(sqs, protocol):
+  path = getpath(protocol) 
+  tq = TaskQueue(path, n_threads=0)
 
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      tq = QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
+  n_inserts = 5
+  tq.purge()
+  tq.insert(( PrintTask() for _ in range(n_inserts) ))
+  
+  for i in range(n_inserts):
+    t = tq.lease()
+    tq.delete(t)
 
-      n_inserts = 5
-      tq.purge()
-      for _ in range(n_inserts):
-        task = PrintTask()
-        tq.insert(task)
-      tq.wait()
-      tq.purge()
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_single_threaded_insertion(sqs, protocol):
+  path = getpath(protocol) 
+  tq = TaskQueue(path, n_threads=0)
 
-def test_single_threaded_insertion():
-  global QUEUE_NAME
+  tq.purge()
+  
+  n_inserts = 5
+  tq.insert(( PrintTask() for i in range(n_inserts) ))
 
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      tq = QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
+  assert all(map(lambda x: type(x) == PrintTask, tq.list()))
 
-      tq.purge()
-      
-      n_inserts = 5
-      for _ in range(n_inserts):
-        task = PrintTask()
-        tq.insert(task)
-      tq.wait()
+  tq.purge()
 
-      assert all(map(lambda x: type(x) == PrintTask, tq.list()))
+@pytest.mark.parametrize('protocol', PROTOCOL)
+@pytest.mark.parametrize('green', (True, False))
+@pytest.mark.parametrize('threads', (1, 2, 10, 20, 40))
+def test_multi_threaded_insertion(sqs, protocol, green, threads):
+  path = getpath(protocol) 
 
-      tq.purge()
+  tq = TaskQueue(path, n_threads=threads, green=green)
 
-def test_multi_threaded_insertion():
-  global QUEUE_NAME
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      tq = QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL)
-
-      n_inserts = 10
-      tq.purge()
-      tq.wait()
-     
-      for _ in range(n_inserts):
-        task = PrintTask()
-        tq.insert(task)
-      tq.wait()
-
-      tq.purge()
+  n_inserts = 40
+  tq.purge()
+  tq.insert(( PrintTask() for i in range(n_inserts)))
+  tq.purge()
 
 # def test_multiprocess_upload():
 #   global QURL
@@ -121,43 +125,39 @@ def test_multi_threaded_insertion():
 #     with TaskQueue(QURL) as tq:
 #       tq.purge()
 
-def test_400_errors():
-  global QUEUE_NAME
-  for qtype in QTYPES:
-    for QueueClass in (TaskQueue, GreenTaskQueue):
-      with QueueClass(n_threads=0, queue_name=QUEUE_NAME, queue_server=qtype, qurl=QURL) as tq:
-        tq.delete('nonexistent')
+
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_400_errors(sqs, protocol):
+  path = getpath(protocol) 
+
+  tq = TaskQueue(path, n_threads=0)
+  tq.delete('nonexistent')
 
 def test_local_taskqueue():
-  with LocalTaskQueue(parallel=True, progress=False) as tq:
-    for i in range(20000):
-      tq.insert(
-        MockTask(arg=i)
-      )
+  tq = LocalTaskQueue(parallel=True, progress=False)
+  tasks = ( MockTask(arg=i) for i in range(20000) )
+  tq.insert(tasks)
 
-  with LocalTaskQueue(parallel=1, progress=False) as tq:
-    for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+  tq = LocalTaskQueue(parallel=1, progress=False)
+  tasks = ( (ExecutePrintTask(), [i], { 'wow2': 4 }) for i in range(200) )
+  tq.insert(tasks)
 
-  with LocalTaskQueue(parallel=True, progress=False) as tq:
-    for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
+  tq = LocalTaskQueue(parallel=True, progress=False)
+  tasks = ( (ExecutePrintTask(), [i], { 'wow2': 4 }) for i in range(200) )
+  tq.insert(tasks)
 
-  with LocalTaskQueue(parallel=True, progress=False) as tq:
-    epts = [ PrintTask(i) for i in range(200) ]
-    tq.insert_all(epts)
+  tq = LocalTaskQueue(parallel=True, progress=False)
+  epts = [ PrintTask(i) for i in range(200) ]
+  tq.insert(epts)
 
-  with MockTaskQueue(parallel=True, progress=False) as tq:
-    for i in range(200):
-      tq.insert(ExecutePrintTask(), [i], { 'wow2': 4 })
-
-def test_parallel_insert_all():
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_parallel_insert_all(sqs, protocol):
   import pathos_issue
 
-  global QURL
-  tq = GreenTaskQueue(QURL)
+  path = getpath(protocol) 
+  tq = TaskQueue(path, green=True)
 
   tasks = pathos_issue.crt_tasks(5, 20)
-  tq.insert_all(tasks, parallel=2)
+  tq.insert(tasks, parallel=2)
 
   tq.purge()
