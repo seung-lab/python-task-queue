@@ -10,11 +10,6 @@ import shutil
 import uuid
 import time
 
-try:
-  from os import scandir
-except ImportError:
-  from scandir import scandir
-
 import tenacity
 
 from .registered_task import totask, totaskid
@@ -277,7 +272,7 @@ class FileQueueAPI(object):
   def release_all(self):
     """Voids all leases and sets all tasks to available."""
     now = nowfn()
-    for file in scandir(self.queue_path):
+    for file in os.scandir(self.queue_path):
       if get_timestamp(file.name) < now:
         continue
 
@@ -324,7 +319,7 @@ class FileQueueAPI(object):
       return (int(timestamp), filename)
 
     now = nowfn()
-    files = ( fmt(direntry) for direntry in scandir(self.queue_path) )
+    files = ( fmt(direntry) for direntry in os.scandir(self.queue_path) )
 
     leasable_files = []
 
@@ -389,8 +384,8 @@ class FileQueueAPI(object):
 
   def purge(self):
     all_files = itertools.chain(
-      scandir(self.queue_path), 
-      scandir(self.movement_path)
+      os.scandir(self.queue_path), 
+      os.scandir(self.movement_path)
     )
     for file in all_files:
       try:
@@ -410,10 +405,10 @@ class FileQueueAPI(object):
       with open(path, 'rt') as f:
         return f.read()
 
-    return ( read(f.path) for f in scandir(self.queue_path) )
+    return ( read(f.path) for f in os.scandir(self.queue_path) )
 
   def __len__(self):
-    return functools.reduce(operator.add, ( 1 for f in scandir(self.queue_path) ), 0)
+    return functools.reduce(operator.add, ( 1 for f in os.scandir(self.queue_path) ), 0)
       
       
 

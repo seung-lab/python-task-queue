@@ -8,4 +8,3 @@ pbr
 tenacity
 tqdm
 requests>2,<3
-scandir
