@@ -70,8 +70,12 @@ tq = TaskQueue('fq:///path/to/queue/directory/') # file queue ('fq')
 
 tq.insert(( PrintTask(i) for i in range(1000) )) # can use any iterable
 tq.enqueued # approximate number of tasks in the queue
-tq.inserted # fq only! total number of tasks inserted
-tq.completed # fq only! number of tasks completed, requires tally=True with poll
+
+# FileQueue Only:
+tq.inserted #  total number of tasks inserted
+tq.completed # number of tasks completed, requires tally=True with poll
+tq.rezero() # reset statistics like inserted and completed
+tq.release_all() # set all tasks to available
 ```
 
 This inserts 1000 PrintTask JSON descriptions into your SQS queue.
@@ -94,11 +98,22 @@ Poll will check the queue for a new task periodically. If a task is found, it wi
 
 ### Notes on File Queue
 
+```python
+# FileQueue Specific Features
+
+tq.inserted # number of inserted tasks
+tq.completed # number of completed tasks (counts rerun tasks too)
+tq.rezero() # sets tq.inserted and tq.completed to zero.
+tq.release_all() # sets all tasks to available
+```
+
 FileQueue (`fq://`) is designed to simulate the timed task leasing feature from SQS and exploits a common filesystem to avoid requiring an additional queue server. You can read in detail about its design [on the wiki](https://github.com/seung-lab/python-task-queue/wiki/FileQueue-Design).  
 
-There are a few things FileQueue can do that SQS can't and also some quirks you should be aware of. For one, FileQueue can track the number of task completions (`tq.completions`, `tq.poll(..., tally=True)`), but it does so by appending a byte to a file called `completions` for each completion. The size of the file in bytes is the number of completions. This design is an attempt to avoid problems with locking and race conditions. FileQueue also tracks insertions (`tq.insertions`) in a more typical way in an `insertions` file.
+There are a few things FileQueue can do that SQS can't and also some quirks you should be aware of. For one, FileQueue can track the number of task completions (`tq.completions`, `tq.poll(..., tally=True)`), but it does so by appending a byte to a file called `completions` for each completion. The size of the file in bytes is the number of completions. This design is an attempt to avoid problems with locking and race conditions. FileQueue also tracks insertions (`tq.insertions`) in a more typical way in an `insertions` file. Also unlike SQS, FileQueue allows listing all tasks at once.  
 
 FileQueue also allows releasing all current tasks from their leases, something impossible in SQS. Sometimes a few tasks will die immediately after leasing, but with a long lease, and you'll figure out how to fix them. Instead of starting over or waiting possibly hours, you can set the queue to be made available again (`tq.release_all()`).
+
+As FileQueue is based on the filesystem, it can be managed somewhat via the command line. To delete a queue, just `rm -r $QUEUE_PATH`. To reset a counter: `rm $QUEUE_PATH/completions` (e.g.). If you are brave, you could even use the `mv` command to reassign a task's availability.
 
 ## Motivation
 
