@@ -50,6 +50,10 @@ tq.insert_all(tasks) # performs on-line execution (naming is historical)
 # alterternative serial model
 tq.insert(tasks)
 tq.execute()
+
+# delete tasks
+tq.delete(tasks)
+tq.purge() # delete all tasks
 ```
 This will load the queue with 1000 print tasks then execute them across five processes.
 

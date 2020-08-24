@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+2.0.0
+-----
+
+* release(2.0.0): major refactor + FileQueue
+* docs: more documentation for FileQueue
+* chore: update Trove classifiers to exclude py27 and include py38
+* BREAKING: drop python 2.7 support (#25)
 * test: fix travis
 * fix: support py27 with scandir pkg
 * feat: FileQueue + big redesign of TaskQueue (#24)
