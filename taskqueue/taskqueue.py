@@ -63,11 +63,10 @@ class TaskQueue(object):
   ):
     self.qurl = qurl
     self.path = extract_path(qurl)
-    self.api = self.initialize_api(self.path, kwargs)
+    self.api = self.initialize_api(self.path, **kwargs)
     self.n_threads = n_threads
     self.green = bool(green)
     self.progress = bool(progress),
-    self.kwargs = kwargs
 
     if self.green:
       self.check_monkey_patch_status()
@@ -76,9 +75,11 @@ class TaskQueue(object):
   def qualified_path(self):
     return mkpath(self.path)
 
-  def initialize_api(self, path, kwargs):
+  def initialize_api(self, path, region_name=AWS_DEFAULT_REGION, **kwargs):
+    if 'region' in kwargs:
+      region_name = kwargs['region']
     if path.protocol == 'sqs':
-      return AWSTaskQueueAPI(qurl=path.path, region_name=kwargs.get('region', AWS_DEFAULT_REGION))
+      return AWSTaskQueueAPI(path.path, region_name=region_name, **kwargs)
     elif path.protocol == 'fq':
       return FileQueueAPI(path.path)
     else:

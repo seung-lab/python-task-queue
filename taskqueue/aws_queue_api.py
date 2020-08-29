@@ -11,7 +11,7 @@ from .secrets import aws_credentials
 AWS_BATCH_SIZE = 10 # send_message_batch's max batch size is 10
 
 class AWSTaskQueueAPI(object):
-  def __init__(self, qurl, region_name=None):
+  def __init__(self, qurl, **kwargs):
     """
     qurl: either a queue name (e.g. 'pull_queue') or a url
       like https://sqs.us-east-1.amazonaws.com/DIGITS/wms-pull-queue
@@ -25,11 +25,11 @@ class AWSTaskQueueAPI(object):
       self.qurl = None
 
     credentials = aws_credentials()
-   
+    
     self.sqs = boto3.client('sqs', 
-      region_name=region_name, 
-      aws_secret_access_key=credentials['AWS_SECRET_ACCESS_KEY'],
-      aws_access_key_id=credentials['AWS_ACCESS_KEY_ID'],
+      aws_secret_access_key=credentials.get('AWS_SECRET_ACCESS_KEY'),
+      aws_access_key_id=credentials.get('AWS_ACCESS_KEY_ID'),
+      **kwargs,
     )    
 
     if self.qurl is None:
