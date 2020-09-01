@@ -27,9 +27,7 @@ from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
 from .registered_task import RegisteredTask, deserialize, totask, totaskid
 from .scheduler import schedule_jobs
-from .secrets import (
-  AWS_DEFAULT_REGION
-)
+
 
 def totalfn(iterator, total):
   if total is not None:
@@ -55,6 +53,8 @@ class TaskQueue(object):
   it still needs to delete the task. 
   Tasks should be designed to be idempotent to avoid errors 
   if multiple clients complete the same task.
+  
+  The kwargs parameter dict should be queue-type specific parameters that are needed.
   """
   def __init__(
     self, qurl, n_threads=40, 
@@ -75,11 +75,16 @@ class TaskQueue(object):
   def qualified_path(self):
     return mkpath(self.path)
 
-  def initialize_api(self, path, region_name=AWS_DEFAULT_REGION, **kwargs):
-    if 'region' in kwargs:
-      region_name = kwargs['region']
+  def initialize_api(self, path, **kwargs):
+    """Creates correct API object for the type of path 
+    
+    Args:
+      path: ExtractedPath representing the location of the queue
+      region_name: The region for cloud-based queues (optional)
+      kwargs: Keywords to be passed to the underlying queue (optional)
+    """
     if path.protocol == 'sqs':
-      return AWSTaskQueueAPI(path.path, region_name=region_name, **kwargs)
+      return AWSTaskQueueAPI(path.path, **kwargs)
     elif path.protocol == 'fq':
       return FileQueueAPI(path.path)
     else:

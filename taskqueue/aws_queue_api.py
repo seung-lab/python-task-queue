@@ -7,15 +7,23 @@ import botocore.errorfactory
 
 from .lib import toiter, sip
 from .secrets import aws_credentials
+from .secrets import (
+  AWS_DEFAULT_REGION
+)
 
 AWS_BATCH_SIZE = 10 # send_message_batch's max batch size is 10
 
 class AWSTaskQueueAPI(object):
-  def __init__(self, qurl, **kwargs):
+  def __init__(self, qurl, region_name=AWS_DEFAULT_REGION, **kwargs):
     """
     qurl: either a queue name (e.g. 'pull_queue') or a url
       like https://sqs.us-east-1.amazonaws.com/DIGITS/wms-pull-queue
+    kwargs: Keywords for the underlying boto3.client constructor, other than `service_name`, 
+      `region_name`, `aws_secret_access_key`, or `aws_access_key_id`.
     """
+    if 'region' in kwargs:
+      region_name = kwargs.pop('region')
+    
     matches = re.search(r'sqs.([\w\d-]+).amazonaws', qurl)
 
     if matches is not None:
@@ -29,6 +37,7 @@ class AWSTaskQueueAPI(object):
     self.sqs = boto3.client('sqs', 
       aws_secret_access_key=credentials.get('AWS_SECRET_ACCESS_KEY'),
       aws_access_key_id=credentials.get('AWS_ACCESS_KEY_ID'),
+      region_name=region_name,
       **kwargs,
     )    
 
