@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+2.1.0
+-----
+
+* release(2.1.0): adds support for additional SQS client arguments
+* Allow taskqueue instantiation with any boto3 client keywords (#26)
+* docs: show how to use delete and purge
+
 2.0.0
 -----
 
