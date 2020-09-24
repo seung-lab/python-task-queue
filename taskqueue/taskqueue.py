@@ -332,13 +332,14 @@ class TaskQueue(object):
         task = self.lease(seconds=int(lease_seconds))
         tries += 1
         before_fn(task)
+        printv("INFO Running", task, " (id: {})".format(task.id))
         time_start = time.time()
         task.execute(*execute_args, **execute_kwargs)
         time_delta = time.time() - time_start
         executed += 1
-        printv("Delete enqueued task...")
+        printv("INFO Deleting", task.id)
         self.delete(task, tally=tally)
-        printv('INFO', task , "succesfully executed in {:.2f} sec.".format(time_delta))
+        printv('INFO', type(task).__name__, task.id , "succesfully executed in {:.2f} sec.".format(time_delta))
         after_fn(task)
         tries = 0
       except backoff_exceptions:
