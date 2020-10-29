@@ -65,6 +65,27 @@ def test_task_creation():
       "with_kwargs": None
   }
 
+def test_queue_transfer(sqs):
+  tqsqs = TaskQueue(getpath("sqs"))
+  tqsqs.purge()
+  tqfq = TaskQueue(getpath("fq"))
+  tqfq.purge()
+
+  assert tqsqs.enqueued == 0
+
+  tqfq.insert(( PrintTask() for _ in range(10) ))
+  tqsqs.insert(tqfq)
+
+  assert tqsqs.enqueued == 10
+  task = tqsqs.lease()
+  assert isinstance(task, PrintTask)
+
+  try:
+    tqfq.insert(tqsqs)
+    assert False
+  except taskqueue.UnsupportedProtocolError:
+    pass
+
 @pytest.mark.parametrize('protocol', PROTOCOL)
 def test_get(sqs, protocol):
   path = getpath(protocol) 

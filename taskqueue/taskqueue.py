@@ -1,7 +1,3 @@
-from __future__ import print_function
-
-import six
-
 import copy
 from functools import partial
 import json
@@ -148,6 +144,13 @@ class TaskQueue(object):
     return [ totask(x) for x in iter(self.api) ]
 
   def insert(self, tasks, delay_seconds=0, total=None, parallel=1):
+    if isinstance(tasks, TaskQueue):
+      taskgen = tasks.tasks()
+      if not isinstance(taskgen, TaskQueue):
+        return self.insert(taskgen, delay_seconds, total, parallel)
+      else:
+        raise ValueError(str(tasks) + " would have caused an infinite recursion by returning a TaskQueue object from obj.tasks()")
+    
     tasks = toiter(tasks)
     total = totalfn(tasks, total)
 
@@ -265,7 +268,8 @@ class TaskQueue(object):
 
   def tasks(self):
     """
-    Iterate over all tasks. 
+    Iterate over all tasks.
+
     Can cause infinite loops on SQS and so is not
     supported. You can use the api method directly 
     if you know what you're doing.
@@ -273,10 +277,7 @@ class TaskQueue(object):
     if self.path.protocol == "sqs":
       raise UnsupportedProtocolError("SQS could enter an infinite loop from this method.")
 
-    tsks = ( totask(task) for task in iter(self.api) )
-    if N >= 0:
-      return itertools.islice(tsks, 0, N)
-    return tsks
+    return ( totask(task) for task in iter(self.api) )
 
   def poll(
     self, lease_seconds=LEASE_SECONDS,  
