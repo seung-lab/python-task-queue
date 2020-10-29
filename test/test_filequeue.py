@@ -79,3 +79,26 @@ def test_renew():
 
   assert ts(filename) >= int(time.time()) + 1
   assert ident(filename) == identity
+
+def test_enumerating_tasks():
+  tq = TaskQueue(FILE_QURL)
+  tq.purge()
+
+  for _ in range(10):
+    tq.insert(PrintTask('hello'))
+    tq.insert(PrintTask('world'))
+
+  lst = list(tq.tasks())
+  
+  assert len(lst) == 20
+  hello = 0
+  world = 0
+  for task in lst:
+    hello += int(task.txt == "hello")
+    world += int(task.txt == "world")
+
+  assert hello == 10
+  assert world == 10
+
+
+

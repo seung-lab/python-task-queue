@@ -37,6 +37,9 @@ def totalfn(iterator, total):
   except TypeError:
     return None
 
+class UnsupportedProtocolError(BaseException):
+  pass
+
 class QueueEmptyError(LookupError):
   pass
 
@@ -88,7 +91,7 @@ class TaskQueue(object):
     elif path.protocol == 'fq':
       return FileQueueAPI(path.path)
     else:
-      raise ValueError('Unsupported protocol ' + str(self.path.protocol))
+      raise UnsupportedProtocolError('Unsupported protocol ' + str(self.path.protocol))
 
   def check_monkey_patch_status(self):
     import gevent.monkey
@@ -259,6 +262,21 @@ class TaskQueue(object):
           self.delete(task)
         self.wait()
       return self
+
+  def tasks(self):
+    """
+    Iterate over all tasks. 
+    Can cause infinite loops on SQS and so is not
+    supported. You can use the api method directly 
+    if you know what you're doing.
+    """
+    if self.path.protocol == "sqs":
+      raise UnsupportedProtocolError("SQS could enter an infinite loop from this method.")
+
+    tsks = ( totask(task) for task in iter(self.api) )
+    if N >= 0:
+      return itertools.islice(tsks, 0, N)
+    return tsks
 
   def poll(
     self, lease_seconds=LEASE_SECONDS,  

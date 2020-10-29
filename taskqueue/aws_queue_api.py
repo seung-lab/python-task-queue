@@ -170,9 +170,6 @@ class AWSTaskQueueAPI(object):
       for task in tasks:
         self.delete(task)
     return self
-
-  def list(self):
-    return list(self)
     
   def __iter__(self):
     return iter(self._request(num_tasks=10, visibility_timeout=0))
