@@ -169,6 +169,10 @@ class TaskQueue(object):
     ct_lock = threading.Lock()
     def insertfn(batch, ct):
       try:
+        # Set incr = 0 first because 
+        # UnboundLocalError: local variable 'incr' referenced before assignment 
+        # when e.g. OSError: [Errno 28] No space left on device
+        incr = 0 
         incr = self.api.insert(batch, delay_seconds) 
       finally:
         with ct_lock:
