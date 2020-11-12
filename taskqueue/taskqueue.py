@@ -342,6 +342,7 @@ class TaskQueue(object):
 
     tries = 0
     executed = 0
+    total_elapsed_sec = 0
 
     backoff = False
     backoff_exceptions = tuple(list(backoff_exceptions) + [ QueueEmptyError ])
@@ -349,7 +350,10 @@ class TaskQueue(object):
     before_fn = before_fn or (lambda x: x)
     after_fn = after_fn or (lambda x: x)
 
+    loop_init_time = time.time()
+
     while LOOP:
+      total_elapsed_sec = time.time() - loop_init_time
       task = 'unknown' # for error message prior to leasing
       try:
         task = self.lease(seconds=int(lease_seconds))
@@ -379,6 +383,8 @@ class TaskQueue(object):
         stop_fn_bound = partial(stop_fn_bound, tries=tries)
       if 'previous_execution_time' in varnames:
         stop_fn_bound = partial(stop_fn_bound, previous_execution_time=time_delta) 
+      if 'elapsed_time' in varnames:
+        stop_fn_bound = partial(stop_fn_bound, elapsed_time=total_elapsed_sec) 
 
       if stop_fn_bound():
         break

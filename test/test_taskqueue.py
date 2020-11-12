@@ -182,3 +182,29 @@ def test_parallel_insert_all(sqs, protocol):
   tq.insert(tasks, parallel=2)
 
   tq.purge()
+
+def test_polling(sqs):
+  N = 100
+  tasks = [ PrintTask(i) for i in range(N) ]
+  tq = TaskQueue(getpath('fq'), green=False)
+  tq.purge()
+  tq.insert(tasks)
+
+  tq.poll(
+    lease_seconds=1, 
+    verbose=False, 
+    tally=True, 
+    stop_fn=(lambda executed: executed >= 5)
+  )
+
+  tq.purge()
+  tq.insert(tasks)
+
+  tq.poll(
+    lease_seconds=1, 
+    verbose=False, 
+    tally=True, 
+    stop_fn=(lambda elapsed_time: elapsed_time >= 1)
+  )
+
+

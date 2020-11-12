@@ -1,6 +1,21 @@
 CHANGES
 =======
 
+2.3.0
+-----
+
+* release(2.3.0): queue transfer capability
+* feat: allow inserting a FileTaskQueue into an AWS TaskQueue
+* feat: add tq.tasks() method
+* fix(taskqueue): rare error where incr is referenced before assignment
+
+2.2.0
+-----
+
+* release(2.2.0): updates verbose messages in tq.poll
+* feat(tq.poll): add pre-execution message to verbose mode (#27)
+* chore: udpate authors and changelog
+
 2.1.0
 -----
 
