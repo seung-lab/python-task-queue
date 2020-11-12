@@ -302,8 +302,9 @@ class TaskQueue(object):
     stop_fn: A boolean returning function that accepts no parameters. When
       it returns True, the task execution loop will terminate. It is evaluated
       once after every task. If you provide the arguments `executed` (tasks completed) 
-      `tries` (current attempts at fetching a task), or `previous_execution_time` (time in
-      seconds to run the last task) they will be dependency injected.
+      `tries` (current attempts at fetching a task), `previous_execution_time` (time in
+      seconds to run the last task), or `elapsed_time` (time since polling started in 
+      seconds) they will be dependency injected.
     before_fn: Pass task pre-execution.
     after_fn: Pass task post-execution.
     verbose: print out the status of each step
