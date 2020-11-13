@@ -4,4 +4,4 @@ from .taskqueue import (
   multiprocess_upload, QueueEmptyError, totask, UnsupportedProtocolError
 )
 
-__version__ = '2.4.0'
+__version__ = '2.5.0'
