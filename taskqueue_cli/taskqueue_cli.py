@@ -21,11 +21,6 @@ def main():
   """
   pass
 
-# @main.command()
-# def version():
-#   """Prints the version."""
-#   print(f"task-queue v{__version__}")
-
 @main.command()
 def license():
   """Prints the license for this library and cli tool."""
