@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+2.5.0
+-----
+
+* release(2.5.0): ptq CLI tool
+* refactor: remove commented out code
+* feat(cli): add ptq command
+
 2.4.0
 -----
 

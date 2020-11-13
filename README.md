@@ -168,6 +168,18 @@ FileQueue also allows releasing all current tasks from their leases, something i
 
 As FileQueue is based on the filesystem, it can be managed somewhat via the command line. To delete a queue, just `rm -r $QUEUE_PATH`. To reset a counter: `rm $QUEUE_PATH/completions` (e.g.). If you are brave, you could even use the `mv` command to reassign a task's availability.
 
+We also discovered that FileQueues are also amenable to fixing problems on the fly. In one case, we generated a set of tasks that took 4.5 hours of computation time and decided to run those tasks on a different cluster. The 500k tasks each contained a path to the old storage cluster. Using `find`, `xargs`, and `sed` we were able to fix them efficiently. 
+
+#### Bundled `ptq` CLI Tool 
+
+As of 2.5.0, we now bundle a command line tool `ptq` to make managing running FileQueues easier.
+
+```bash
+ptq status fq://./my-queue # prints vital statistics
+ptq release fq://./my-queue # releases all tasks from their lease
+ptq rezero fq://./my-queue # resets statistics to zero
+```
+
 ## Motivation
 
 Distributed dependency free task execution engines (such as [Igneous](https://github.com/seung-lab/igneous/)) often make use of cloud based queues like Amazon Simple Queue Service (SQS). In the connectomics field we process petascale images which requires generating hundreds of thousands or millions of cloud tasks per a run. In one case, we were processing serial blocks of a large image where each block depended on the previous block's completion. Each block's run required the generation and upload of millions of tasks and the use of thousands of workers. The workers would rapidly drain the task queue and it was important to ensure that it could be fed fast enough to prevent starvation of this enormous cluster.
