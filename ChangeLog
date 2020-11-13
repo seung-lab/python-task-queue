@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+2.4.0
+-----
+
+* release(2.4.0): adds elapsed\_time DI argument to stop\_fn
+* docs: describe elapsed\_time parameter
+* feat: add "elapsed\_time" DI argument to stop\_fn
+
 2.3.0
 -----
 

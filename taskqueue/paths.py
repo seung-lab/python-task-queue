@@ -15,13 +15,20 @@ ALLOWED_PROTOCOLS = [ 'sqs', 'fq', 'mem' ]
 def mkpath(extracted_path):
   return extracted_path.protocol + "://" + extracted_path.path
 
+def get_protocol(cloudpath):
+  protocol_re = re.compile(r'(?P<proto>\w+)://')
+  match = re.match(protocol_re, cloudpath)
+  if not match:
+    return None
+  return match.group("proto")
+
 def pop_protocol(cloudpath):
   protocol_re = re.compile(r'(\w+)://')
 
   match = re.match(protocol_re, cloudpath)
 
   if not match:
-    return ('sqs', cloudpath)
+    return ("sqs", cloudpath)
 
   (protocol,) = match.groups()
   cloudpath = re.sub(protocol_re, '', cloudpath, count=1)
