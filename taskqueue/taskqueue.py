@@ -126,6 +126,10 @@ class TaskQueue(object):
   def completed(self):
     return self.api.completed
 
+  @property
+  def leased(self):
+    return self.api.leased
+
   def is_empty(self):
     return self.api.is_empty()
 

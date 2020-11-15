@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+2.5.1
+-----
+
+* release(2.5.1): fix packaging for CLI
+* fix: make sure cli is packaged
 * docs: describe new ptq tool
 
 2.5.0

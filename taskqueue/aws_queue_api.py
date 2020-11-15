@@ -63,6 +63,10 @@ class AWSTaskQueueAPI(object):
   def completed(self):
     raise NotImplementedError()
 
+  @property
+  def leased(self):
+    raise NotImplementedError()
+
   def is_empty():
     return self.enqueued == 0
 

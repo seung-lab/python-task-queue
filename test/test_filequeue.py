@@ -54,6 +54,20 @@ def test_count_insertions():
 
   tq.purge()
 
+def test_count_leases():
+  tq = crtq()
+  assert tq.leased == 0
+  tq.lease(seconds=10000)
+  assert tq.leased == 1
+  tq.lease(seconds=10000)
+  tq.lease(seconds=10000)
+  tq.lease(seconds=10000)
+  assert tq.leased == 4
+  tq.release_all()
+  assert tq.leased == 0
+
+  tq.purge()
+
 def test_renew():
   tq = TaskQueue(FILE_QURL)
   tq.purge()

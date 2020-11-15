@@ -42,6 +42,7 @@ def status(queuepath):
   ins = tq.inserted
   enq = tq.enqueued
   comp = tq.completed
+  leased = tq.leased
   print(f"Inserted: {ins}")
   if ins > 0:
     print(f"Enqueued: {enq} ({enq / ins * 100:.1f}% left)")
@@ -49,6 +50,11 @@ def status(queuepath):
   else:
     print(f"Enqueued: {enq} (--% left)")
     print(f"Completed: {comp} (--%)")
+
+  if enq > 0:
+    print(f"Leased: {leased} ({leased / enq * 100:.1f}% of queue)")
+  else:
+    print(f"Leased: {leased} (--%) of queue")
 
 @main.command()
 @click.argument("queuepath")

@@ -191,6 +191,14 @@ class FileQueueAPI(object):
     except FileNotFoundError:
       return 0
 
+  @property
+  def leased(self):
+    now = nowfn()
+    ct = 0
+    for file in os.scandir(self.queue_path):
+      ct += int(get_timestamp(file.name) > now)
+    return ct
+
   @retry
   def insert(self, tasks, delay_seconds=0):
     tasks = toiter(tasks)
