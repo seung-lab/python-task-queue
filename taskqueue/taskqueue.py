@@ -23,6 +23,7 @@ from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
 from .scheduler import schedule_jobs
 from .queueables import totask, totaskid
+from .queueablefns import serialize as serializefn
 
 def totalfn(iterator, total):
   if total is not None:
@@ -169,7 +170,7 @@ class TaskQueue(object):
     def payload(task):
       if hasattr(task, 'payload'):
         return task.payload()
-      return queueablefns.serialize(task)
+      return serializefn(task)
 
     bodies = (
       {
@@ -285,9 +286,7 @@ class TaskQueue(object):
     if self.path.protocol == "sqs":
       raise UnsupportedProtocolError("SQS could enter an infinite loop from this method.")
 
-    x = [ task for task in iter(self.api) ]
-    print(x)
-    return ( totask(task) for task in x )
+    return ( totask(task) for task in iter(self.api) )
 
   def poll(
     self, lease_seconds=LEASE_SECONDS,  

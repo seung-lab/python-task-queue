@@ -23,7 +23,7 @@ def totask(data, ident=-1):
 
   if type(data) is bytes:
     data = data.decode('utf8')
-  if isinstance(data, six.string_types):
+  if isinstance(data, str):
     data = orjson.loads(data)
   data[3] = ident
   return FunctionTask(*data) 
@@ -76,7 +76,7 @@ def jsonifyable(obj):
   if isinstance(obj, list) or isinstance(obj, tuple):
     return [ jsonifyable(x) for x in obj ] 
 
-  for key, val in six.iteritems(obj):
+  for key, val in obj.items():
     if isinstance(val, np.ndarray):
       obj[key] = val.tolist()
     elif isinstance(val, dict):
@@ -91,12 +91,15 @@ def jsonifyable(obj):
 def argsokay(fn, args, kwargs):
   spec = inspect.getfullargspec(fn)
 
+  sargs = spec.args or []
+  sdefaults = spec.defaults or []
+
   kwargct = 0
-  sargs = set(spec.args)
+  sargs = set(sargs)
   for name in kwargs.keys():
     kwargct += (name in sargs)
 
-  if len(spec.args) - len(spec.defaults) <= len(args) + kwargct <= len(spec.args):
+  if not (len(sargs) - len(sdefaults) <= len(args) + kwargct <= len(sargs)):
     return False
 
   for name in kwargs.keys():
@@ -108,7 +111,6 @@ def argsokay(fn, args, kwargs):
 def serialize(fn, id=None):
   if isinstance(fn, FunctionTask):
     return fn.serialize()
-
   if not isinstance(fn, partial) and not callable(fn):
     raise ValueError("Must be a partial or other callable.")
 
@@ -135,7 +137,7 @@ def serialize(fn, id=None):
 def deserialize(data):
   if type(data) is bytes:
     data = data.decode('utf8')
-  if isinstance(data, six.string_types):
+  if isinstance(data, str):
     data = orjson.loads(data)
   return FunctionTask(*data)
 
