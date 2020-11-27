@@ -1,7 +1,8 @@
 import six
 from six import with_metaclass
+import functools
 import inspect
-import json
+import orjson
 import copy
 import re
 from collections import OrderedDict
@@ -11,39 +12,17 @@ import numpy as np
 
 REGISTRY = {}
 
-def totask(task):
-  if isinstance(task, RegisteredTask):
-    return task
-
-  if type(task) is bytes:
-    task = task.decode('utf8')
-
-  if isinstance(task, six.string_types):
-    task = json.loads(task)
-
-  ident = task.get('id', -1)
-
-  if 'payload' in task:
-    task = task['payload']
-
+def totask(task, ident=-1):
   taskobj = deserialize(task)
   taskobj._id = ident
   return taskobj
-
-def totaskid(taskid):
-  if isinstance(taskid, RegisteredTask):
-    return taskid.id
-  elif 'id' in taskid:
-    return taskid['id']
-    
-  return taskid
 
 def deserialize(data):
   if type(data) is bytes:
     data = data.decode('utf8')
 
   if isinstance(data, six.string_types):
-    data = json.loads(data)
+    data = orjson.loads(data)
 
   name = data['class']
   target_class = REGISTRY[name]

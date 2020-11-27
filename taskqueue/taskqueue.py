@@ -21,9 +21,8 @@ from .lib import yellow, scatter, sip, toiter
 from .aws_queue_api import AWSTaskQueueAPI, AWS_BATCH_SIZE
 from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
-from .registered_task import RegisteredTask, deserialize, totask, totaskid
 from .scheduler import schedule_jobs
-
+from .queueables import totask, totaskid
 
 def totalfn(iterator, total):
   if total is not None:
@@ -167,9 +166,14 @@ class TaskQueue(object):
     except:
       batch_size = 1
     
+    def payload(task):
+      if hasattr(task, 'payload'):
+        return task.payload()
+      return queueablefns.serialize(task)
+
     bodies = (
       {
-        "payload": task.payload(),
+        "payload": payload(task),
         "queueName": self.path.path,
       } 
       for task in tasks
@@ -281,7 +285,9 @@ class TaskQueue(object):
     if self.path.protocol == "sqs":
       raise UnsupportedProtocolError("SQS could enter an infinite loop from this method.")
 
-    return ( totask(task) for task in iter(self.api) )
+    x = [ task for task in iter(self.api) ]
+    print(x)
+    return ( totask(task) for task in x )
 
   def poll(
     self, lease_seconds=LEASE_SECONDS,  

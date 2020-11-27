@@ -3,6 +3,7 @@ click
 gevent
 google-auth>=1.10.0
 google-cloud-core>=1.1.0
+orjson
 numpy>=1.13.1
 pathos
 pbr
