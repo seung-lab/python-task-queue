@@ -10,7 +10,7 @@ from functools import partial
 import numpy as np
 
 REGISTRY = {}
-FunctionTask = namedtuple("FunctionTask", [ "key", "args", "kwargs", "id" ])
+FunctionTaskLite = namedtuple("FunctionTaskLite", [ "key", "args", "kwargs", "id" ])
 
 class UnregisteredFunctionError(BaseException):
   pass
@@ -19,7 +19,7 @@ def totask(data, ident=-1):
   if isinstance(data, FunctionTask):
     return data
   if isinstance(data, partial) or callable(data):
-    return serialize(data)
+    return func2task(data, ident)
 
   if type(data) is bytes:
     data = data.decode('utf8')
@@ -28,36 +28,61 @@ def totask(data, ident=-1):
   data[3] = ident
   return FunctionTask(*data) 
 
+def func2task(fn, ident):
+  args = []
+  kwargs = {}
+  rawfn = fn
+  while isinstance(rawfn, partial):
+    args += rawfn.args
+    kwargs.update(rawfn.keywords)
+    rawfn = rawfn.func
+
+  if not argsokay(rawfn, args, kwargs):
+    raise ValueError("{} didn't get valid arguments. Got: {}, {}. Expected: {}".format(
+      rawfn, args, kwargs, inspect.getfullargspec(rawfn)
+    ))
+
+  return FunctionTask(
+    (rawfn.__module__, rawfn.__name__), 
+    args, 
+    kwargs,
+    ident
+  )
+
 def tofunc(task):
   if callable(task):
     return task
 
-  fn = REGISTRY.get(task[0], None)
+  fn = REGISTRY.get(tuple(task[0]), None)
   if fn is None:
     raise UnregisteredFunctionError("{} is not registered as a queuable function.".format(task.key))
   return partial(fn, *task[1], **task[2])
 
-def execute(task):
-  tofunc(task)()
-
-# class FunctionTask():
-#   __slots__ = ['key', 'args', 'kwargs', 'id']
-#   def __init__(self, key, args, kwargs, id=None):
-#     self.key = tuple(key)
-#     self.args = args
-#     self.kwargs = kwargs
-#     self.id = id
-#     self._order = ('key', 'args', 'kwargs', 'id')
-#   def __getitem__(self, idx):
-#     return getattr(self, self._order[idx])
-#   def __setitem__(self, idx, value):
-#     setattr(self, self._order[idx], value)
-#   def serialize(self):
-#     return serialize(partial(REGISTRY[self.key], *self.args, **self.kwargs))
-#   def execute(self):
-#     self()
-#   def __call__(self):
-#     function(self)()
+class FunctionTask():
+  __slots__ = ['key', 'args', 'kwargs', 'id', '_order']
+  def __init__(self, key, args, kwargs, id=None):
+    self.key = tuple(key)
+    self.args = args
+    self.kwargs = kwargs
+    self.id = id
+    self._order = ('key', 'args', 'kwargs', 'id')
+  def __getitem__(self, idx):
+    return getattr(self, self._order[idx])
+  def __setitem__(self, idx, value):
+    setattr(self, self._order[idx], value)
+  def payload(self):
+    return FunctionTaskLite(self.key, self.args, self.kwargs, self.id)
+  def execute(self, *args, **kwargs):
+    self(*args, **kwargs)
+  def tofunc(self):
+    fn = REGISTRY.get(tuple(self.key), None)
+    if fn is None:
+      raise UnregisteredFunctionError("{} is not registered as a queuable function.".format(self.key))
+    return partial(fn, *self.args, **self.kwargs)
+  def __repr__(self):
+    return "FunctionTask({},{},{},{})".format(self.key, self.args, self.kwargs, self.id)
+  def __call__(self):
+    return self.tofunc()()
 
 def jsonifyable(obj):
   if hasattr(obj, 'serialize') and callable(obj.serialize):
@@ -107,32 +132,6 @@ def argsokay(fn, args, kwargs):
       return False
 
   return True
-
-def serialize(fn, id=None):
-  if isinstance(fn, FunctionTask):
-    return fn.serialize()
-  if not isinstance(fn, partial) and not callable(fn):
-    raise ValueError("Must be a partial or other callable.")
-
-  args = []
-  kwargs = {}
-  rawfn = fn
-  while isinstance(rawfn, partial):
-    args += rawfn.args
-    kwargs.update(rawfn.keywords)
-    rawfn = rawfn.func
-
-  if not argsokay(rawfn, args, kwargs):
-    raise ValueError("{} didn't get valid arguments. Got: {}, {}. Expected: {}".format(
-      rawfn, args, kwargs, inspect.getfullargspec(rawfn)
-    ))
-
-  return FunctionTask(
-    (rawfn.__module__, rawfn.__name__), 
-    jsonifyable(args), 
-    jsonifyable(kwargs),
-    id
-  )
 
 def deserialize(data):
   if type(data) is bytes:

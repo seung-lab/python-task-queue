@@ -23,7 +23,7 @@ from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
 from .scheduler import schedule_jobs
 from .queueables import totask, totaskid
-from .queueablefns import serialize as serializefn
+from .queueablefns import FunctionTask
 
 def totalfn(iterator, total):
   if total is not None:
@@ -167,18 +167,15 @@ class TaskQueue(object):
     except:
       batch_size = 1
     
-    def payload(task):
-      if hasattr(task, 'payload'):
-        return task.payload()
-      return serializefn(task)
-
     bodies = (
       {
-        "payload": payload(task),
+        "payload": totask(task).payload(),
         "queueName": self.path.path,
       } 
       for task in tasks
     )
+
+
 
     ct = [ 0 ] # using a list instead of a raw number to use pass-by-reference
     ct_lock = threading.Lock()

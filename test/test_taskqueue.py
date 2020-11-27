@@ -11,7 +11,8 @@ import pytest
 import taskqueue
 from taskqueue import queueable, FunctionTask, RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 from taskqueue.paths import ExtractedPath, mkpath
-from taskqueue.queueablefns import serialize, tofunc, UnregisteredFunctionError
+from taskqueue.queueables import totask
+from taskqueue.queueablefns import tofunc, UnregisteredFunctionError
 
 @pytest.fixture(scope='function')
 def aws_credentials():
@@ -57,19 +58,19 @@ def printfn(txt):
 
 def test_task_creation_fns():
   task = partial(printfn, "hello world")
-  task = serialize(task)
+  task = totask(task)
 
   assert task.key == ("test_taskqueue", "printfn")
   assert task.args == ["hello world"]
   assert task.kwargs == {}
-  assert task.id == None
+  assert task.id == -1
 
   fn = tofunc(task)
   assert fn() == 1337
 
   try:
-    tofunc(FunctionTask(("fake", "fake"), [], {}, None))
-    assert False, "Should not have been able to create this function."
+    FunctionTask(("fake", "fake"), [], {}, None)()
+    assert False, "Should not have been able to call this function."
   except UnregisteredFunctionError:
     pass
 

@@ -2,7 +2,7 @@ from functools import partial
 
 import orjson
 
-from .queueablefns import totask as qtotask, FunctionTask 
+from .queueablefns import totask as qtotask, FunctionTask, tofunc
 from .registered_task import totask as rtotask, RegisteredTask
 
 def totask(task):
