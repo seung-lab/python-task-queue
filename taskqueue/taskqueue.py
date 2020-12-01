@@ -430,10 +430,12 @@ class LocalTaskQueue(object):
       delay_seconds=0, total=None,
       parallel=None, progress=True
     ):
+    tasks = toiter(tasks)
     for task in tasks:
       args, kwargs = [], {}
       if isinstance(task, tuple):
         task, args, kwargs = task
+      task = totask(task)
       task = {
         'payload': task.payload(),
         'id': -1,
