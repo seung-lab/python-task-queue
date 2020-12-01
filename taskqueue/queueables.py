@@ -2,7 +2,7 @@ from functools import partial
 
 import orjson
 
-from .queueablefns import totask as qtotask, FunctionTask, tofunc
+from .queueablefns import totask as qtotask, FunctionTask, FunctionTaskLite, tofunc
 from .registered_task import totask as rtotask, RegisteredTask
 
 def totask(task):
@@ -20,7 +20,9 @@ def totask(task):
     if 'payload' in task:
       task = task['payload']
 
-  if isinstance(task, list):
+  if isinstance(task, FunctionTaskLite):
+    return FunctionTask(*task)
+  elif isinstance(task, list):
     task[3] = ident
     return FunctionTask(*task)
   elif isinstance(task, dict):
