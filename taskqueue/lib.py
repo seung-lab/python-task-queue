@@ -34,6 +34,15 @@ def toabs(path):
   path = os.path.expanduser(path)
   return os.path.abspath(path)
 
+def nvl(*args):
+  """Return the leftmost argument that is not None."""
+  if len(args) < 2:
+    raise IndexError("nvl takes at least two arguments.")
+  for arg in args:
+    if arg is not None:
+      return arg
+  return args[-1]
+
 def mkdir(path):
   path = toabs(path)
 

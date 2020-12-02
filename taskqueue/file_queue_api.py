@@ -12,7 +12,6 @@ import time
 
 import tenacity
 
-from .registered_task import totask, totaskid
 from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip, toabs
 
 retry = tenacity.retry(

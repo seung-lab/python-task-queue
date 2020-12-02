@@ -21,9 +21,9 @@ from .lib import yellow, scatter, sip, toiter
 from .aws_queue_api import AWSTaskQueueAPI, AWS_BATCH_SIZE
 from .file_queue_api import FileQueueAPI
 from .paths import extract_path, mkpath
-from .registered_task import RegisteredTask, deserialize, totask, totaskid
 from .scheduler import schedule_jobs
-
+from .queueables import totask, totaskid
+from .queueablefns import FunctionTask
 
 def totalfn(iterator, total):
   if total is not None:
@@ -169,11 +169,13 @@ class TaskQueue(object):
     
     bodies = (
       {
-        "payload": task.payload(),
+        "payload": totask(task).payload(),
         "queueName": self.path.path,
       } 
       for task in tasks
     )
+
+
 
     ct = [ 0 ] # using a list instead of a raw number to use pass-by-reference
     ct_lock = threading.Lock()
@@ -428,10 +430,12 @@ class LocalTaskQueue(object):
       delay_seconds=0, total=None,
       parallel=None, progress=True
     ):
+    tasks = toiter(tasks)
     for task in tasks:
       args, kwargs = [], {}
       if isinstance(task, tuple):
         task, args, kwargs = task
+      task = totask(task)
       task = {
         'payload': task.payload(),
         'id': -1,

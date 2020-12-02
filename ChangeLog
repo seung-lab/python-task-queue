@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+2.6.0
+-----
+
+* release(2.6.0): adds number leased to ptq status
+* feat(cli): add number of leased tasks to status for filequeue
+
 2.5.1
 -----
 

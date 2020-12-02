@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import os
 import time
@@ -8,9 +9,10 @@ from six.moves import range
 import pytest
 
 import taskqueue
-from taskqueue import RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
+from taskqueue import queueable, FunctionTask, RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 from taskqueue.paths import ExtractedPath, mkpath
-
+from taskqueue.queueables import totask
+from taskqueue.queueablefns import tofunc, UnregisteredFunctionError, func2task
 
 @pytest.fixture(scope='function')
 def aws_credentials():
@@ -49,7 +51,40 @@ class ExecutePrintTask(RegisteredTask):
     print(wow + wow2)
     return wow + wow2
 
-def test_task_creation():
+@queueable
+def printfn(txt):
+  print(txt)
+  return 1337
+
+@queueable
+def sumfn(a,b):
+  return a + b
+
+def test_task_creation_fns():
+  task = partial(printfn, "hello world")
+  task = totask(task)
+
+  assert task.key == ("test_taskqueue", "printfn")
+  assert task.args == ["hello world"]
+  assert task.kwargs == {}
+  assert task.id == -1
+
+  fn = tofunc(task)
+  assert fn() == 1337
+
+  fn = partial(partial(sumfn, 1), 2)
+  assert func2task(fn, -1)() == 3
+
+  fn = partial(partial(sumfn, 1), b=2)
+  assert func2task(fn, -1)() == 3
+
+  try:
+    FunctionTask(("fake", "fake"), [], {}, None)()
+    assert False, "Should not have been able to call this function."
+  except UnregisteredFunctionError:
+    pass
+
+def test_task_creation_classes():
   task = MockTask(this="is", a=[1, 4, 2], simple={"test": "to", "check": 4},
                serialization=('i', 's', 's', 'u', 'e', 's'), wow=4, with_kwargs=None)
   task.wow = 5
@@ -110,6 +145,20 @@ def test_single_threaded_insertion(sqs, protocol):
   tq.insert(( PrintTask() for i in range(n_inserts) ))
 
   assert all(map(lambda x: type(x) == PrintTask, tq.list()))
+
+  tq.purge()
+
+@pytest.mark.parametrize('protocol', PROTOCOL)
+def test_single_threaded_insertion_fns(sqs, protocol):
+  path = getpath(protocol) 
+  tq = TaskQueue(path, n_threads=0)
+
+  tq.purge()
+  
+  n_inserts = 5
+  tq.insert(( partial(printfn, "hello world " + str(i)) for i in range(n_inserts) ))
+
+  assert all(map(lambda x: isinstance(x, FunctionTask), tq.list()))
 
   tq.purge()
 
