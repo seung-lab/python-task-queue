@@ -70,6 +70,8 @@ class FunctionTask():
     return getattr(self, self._order[idx])
   def __setitem__(self, idx, value):
     setattr(self, self._order[idx], value)
+  def __iter__(self):
+    raise TypeError("FunctionTask is not an iterable.")
   def payload(self):
     return FunctionTaskLite(self.key, self.args, self.kwargs, self.id)
   def execute(self, *args, **kwargs):
@@ -80,7 +82,7 @@ class FunctionTask():
       raise UnregisteredFunctionError("{} is not registered as a queuable function.".format(self.key))
     return partial(fn, *self.args, **self.kwargs)
   def __repr__(self):
-    return "FunctionTask({},{},{},{})".format(self.key, self.args, self.kwargs, self.id)
+    return "FunctionTask({},{},{},\"{}\")".format(self.key, self.args, self.kwargs, self.id)
   def __call__(self):
     return self.tofunc()()
 
@@ -132,13 +134,6 @@ def argsokay(fn, args, kwargs):
       return False
 
   return True
-
-def deserialize(data):
-  if type(data) is bytes:
-    data = data.decode('utf8')
-  if isinstance(data, str):
-    data = orjson.loads(data)
-  return FunctionTask(*data)
 
 def queueable(fn):
   REGISTRY[(fn.__module__, fn.__name__)] = fn
