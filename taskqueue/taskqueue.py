@@ -151,6 +151,7 @@ class TaskQueue(object):
     self, tasks, delay_seconds=0, 
     total=None, parallel=1, skip_insert_counter=False
   ):
+    """Inserts tasks and returns number inserted."""
     if isinstance(tasks, TaskQueue):
       taskgen = tasks.tasks()
       if not isinstance(taskgen, TaskQueue):
@@ -162,8 +163,7 @@ class TaskQueue(object):
     total = totalfn(tasks, total)
 
     if parallel not in (1, False) and total is not None and total > 1:
-      multiprocess_upload(self.__class__, mkpath(self.path), tasks, parallel=parallel)
-      return
+      return multiprocess_upload(self.__class__, mkpath(self.path), tasks, parallel=parallel)
 
     try:
       batch_size = self.api.batch_size
@@ -437,6 +437,7 @@ class LocalTaskQueue(object):
       parallel=None, progress=True
     ):
     tasks = toiter(tasks)
+    ct = 0
     for task in tasks:
       args, kwargs = [], {}
       if isinstance(task, tuple):
@@ -447,10 +448,14 @@ class LocalTaskQueue(object):
         'id': -1,
       }
       self.queue.append( (task, args, kwargs) )
+      ct += 1
+
+    return ct
 
   def insert_all(self, *args, **kwargs):
-    self.insert(*args, **kwargs)
+    ct = self.insert(*args, **kwargs)
     self.execute(self.progress)
+    return ct
 
   def add_insert_count(self, ct):
     pass
@@ -520,9 +525,8 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
     raise ValueError("Parallel must be a positive number or zero (all cpus). Got: " + str(parallel))
 
   if parallel == 1:
-    soloprocess_upload(QueueClass, queue_name, tasks)
-    return 
-
+    return soloprocess_upload(QueueClass, queue_name, tasks)
+    
   def capturing_soloprocess_upload(*args, **kwargs):
     try:
       return soloprocess_upload(*args, **kwargs)
@@ -546,7 +550,7 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
   try:
     task = next(item for item in tasks if item is not None)
   except StopIteration:
-    return 
+    return 0
 
   cls_module = task.__class__.__module__
   task.__class__.__module__ = '__main__'
@@ -554,7 +558,8 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
   with pathos.pools.ProcessPool(parallel) as pool:
     results = pool.map(uploadfn, tasks)
 
-  QueueClass(queue_name).add_insert_count(sum(results))
+  ct = sum(results)
+  QueueClass(queue_name).add_insert_count(ct)
 
   task.__class__.__module__ = cls_module
 
@@ -566,6 +571,8 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
         errors.append(err)
     if len(errors):
       raise Exception(errors)
+
+  return ct
 
 
 

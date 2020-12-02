@@ -172,8 +172,10 @@ def test_multi_threaded_insertion(sqs, protocol, green, threads):
 
   n_inserts = 40
   tq.purge()
-  tq.insert(( PrintTask() for i in range(n_inserts)))
+  ct = tq.insert(( PrintTask() for i in range(n_inserts)))
   tq.purge()
+
+  assert ct == n_inserts
 
 # def test_multiprocess_upload():
 #   global QURL
@@ -206,19 +208,19 @@ def test_400_errors(sqs, protocol):
 def test_local_taskqueue():
   tq = LocalTaskQueue(parallel=True, progress=False)
   tasks = ( MockTask(arg=i) for i in range(20000) )
-  tq.insert(tasks)
+  assert tq.insert(tasks) == 20000
 
   tq = LocalTaskQueue(parallel=1, progress=False)
   tasks = ( (ExecutePrintTask(), [i], { 'wow2': 4 }) for i in range(200) )
-  tq.insert(tasks)
+  assert tq.insert(tasks) == 200
 
   tq = LocalTaskQueue(parallel=True, progress=False)
   tasks = ( (ExecutePrintTask(), [i], { 'wow2': 4 }) for i in range(200) )
-  tq.insert(tasks)
+  assert tq.insert(tasks) == 200
 
   tq = LocalTaskQueue(parallel=True, progress=False)
   epts = [ PrintTask(i) for i in range(200) ]
-  tq.insert(epts)
+  assert tq.insert(epts) == 200
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
 def test_parallel_insert_all(sqs, protocol):
@@ -232,8 +234,9 @@ def test_parallel_insert_all(sqs, protocol):
     tq.rezero()
 
   tasks = pathos_issue.crt_tasks(5, 20)
-  tq.insert(tasks, parallel=2)
+  amt = tq.insert(tasks, parallel=2)
 
+  assert amt == 30 # oddity of the TaskIterator in crt_tasks
   if protocol == 'fq':
     assert tq.inserted == 30 # oddity of the TaskIterator in crt_tasks
 
