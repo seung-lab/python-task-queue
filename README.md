@@ -17,7 +17,7 @@ The task queue uses your CloudVolume secrets located in `$HOME/.cloudvolume/secr
 
 As of version 2.7.0, there are two ways to create a queueable task. The new way is simpler and probably preferred.
 
-### New School: Queuable Functions
+### New School: Queueable Functions
 
 Designate a function as queueable using the `@queueable` decorator. Currently variable positional arguments (`*args`) and variable keyword arguments (`**kwargs`) are not yet supported. If a function is not marked with the decorator, it cannot be executed via the queue.
 

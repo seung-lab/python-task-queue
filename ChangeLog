@@ -4,6 +4,7 @@ CHANGES
 2.7.0
 -----
 
+* release(2.7.0): Queueable functions. Fix for multiprocess insert counter
 * feat: return number inserted from insert
 * fix: resolve race condition in multiprocess insert counter upload
 * chore: remove whitespace
