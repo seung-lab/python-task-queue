@@ -136,5 +136,6 @@ def argsokay(fn, args, kwargs):
   return True
 
 def queueable(fn):
+  """Register the input function as queueable and executable via TaskQueue."""
   REGISTRY[(fn.__module__, fn.__name__)] = fn
   return fn
