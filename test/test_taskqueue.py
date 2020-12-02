@@ -12,7 +12,7 @@ import taskqueue
 from taskqueue import queueable, FunctionTask, RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
 from taskqueue.paths import ExtractedPath, mkpath
 from taskqueue.queueables import totask
-from taskqueue.queueablefns import tofunc, UnregisteredFunctionError
+from taskqueue.queueablefns import tofunc, UnregisteredFunctionError, func2task
 
 @pytest.fixture(scope='function')
 def aws_credentials():
@@ -56,6 +56,10 @@ def printfn(txt):
   print(txt)
   return 1337
 
+@queueable
+def sumfn(a,b):
+  return a + b
+
 def test_task_creation_fns():
   task = partial(printfn, "hello world")
   task = totask(task)
@@ -67,6 +71,12 @@ def test_task_creation_fns():
 
   fn = tofunc(task)
   assert fn() == 1337
+
+  fn = partial(partial(sumfn, 1), 2)
+  assert func2task(fn, -1)() == 3
+
+  fn = partial(partial(sumfn, 1), b=2)
+  assert func2task(fn, -1)() == 3
 
   try:
     FunctionTask(("fake", "fake"), [], {}, None)()
