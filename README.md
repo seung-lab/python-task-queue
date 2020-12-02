@@ -15,6 +15,29 @@ The task queue uses your CloudVolume secrets located in `$HOME/.cloudvolume/secr
 
 ## Usage
 
+As of version 2.7.0, there are two ways to create a queueable task. The new way is simpler and probably preferred.
+
+### New School: Queuable Functions
+
+Designate a function as queueable using the `@queueable` decorator. Currently variable positional arguments (`*args`) and variable keyword arguments (`**kwargs`) are not yet supported. If a function is not marked with the decorator, it cannot be executed via the queue.
+
+```python
+from taskqueue import queueable
+
+@queueable
+def print_task(txt):
+  print(str(txt))
+```
+
+You then create queueable instantiations of these functions by using the standard library [`partial`](https://docs.python.org/3/library/functools.html#functools.partial) function to create a concrete binding.
+
+```python
+from functools import partial
+bound_fn = partial(print_task, txt="hello world")
+```
+
+### Old School: RegisteredTask Subclasses
+
 Define a class that inherits from taskqueue.RegisteredTask and implements the `execute` method. RegisteredTasks contain logic that will render their attributes into a JSON payload and can be reconstituted into a live class on the other side of a task queue.
 
 Tasks can be loaded into queues locally or in the cloud and executed later. Here's an example implementation of a trivial `PrintTask`. The attributes of your container class should be simple values that can be easily encoded into JSON such as ints, floats, strings, and numpy arrays. Let the `execute` method download and manipulate heavier data. If you're feeling curious, you can see what JSON a task will turn into by calling `task.payload()`.
@@ -41,10 +64,14 @@ class PrintTask(RegisteredTask):
 For small jobs, you might want to use one or more processes to execute the tasks:
 
 ```python
+from functools import partial
 from taskqueue import LocalTaskQueue
 
 tq = LocalTaskQueue(parallel=5) # use 5 processes
-tasks = ( PrintTask(i) for i in range(2000) )
+
+
+tasks = ( PrintTask(i) for i in range(2000) ) # OLD SCHOOL
+tasks = ( partial(print_task, i) for i in range(2000) ) # NEW SCHOOL
 
 tq.insert_all(tasks) # performs on-line execution (naming is historical)
 
@@ -74,7 +101,9 @@ from taskqueue import TaskQueue
 tq = TaskQueue('sqs://queue-name', region_name="us-east1-b", green=False)
 tq = TaskQueue('fq:///path/to/queue/directory/') # file queue ('fq')
 
-tq.insert(( PrintTask(i) for i in range(1000) )) # can use any iterable
+# insert accepts any iterable
+tq.insert(( PrintTask(i) for i in range(1000) )) # OLD SCHOOL
+tq.insert(( partial(print_task, i) for i in range(1000) )) # NEW SCHOOL
 tq.enqueued # approximate number of tasks in the queue
 
 # FileQueue Only:
@@ -192,7 +221,7 @@ By default, the Python task queue libraries are single threaded and blocking, re
 
 ## How to Achieve High Performance
 
-Attaining the quoted upload rates is simple but takes a few tricks to tune the queue. By default, TaskQueue will upload hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage. Note that the examples below use `sqs://`, but apply to `fq://` as well.
+Attaining the quoted upload rates is simple but takes a few tricks to tune the queue. By default, TaskQueue will upload hundreds of tasks per second using its threading model. We'll show via progressive examples how to tune your upload script to get many thousands of tasks per second with near zero latency and memory usage. Note that the examples below use `sqs://`, but apply to `fq://` as well. These examples also use the old school style of task instantiation, but you can substitute the new style without consequence.
 
 ```python
 # Listing 1: 10s per second, high memory usage, non-zero latency
