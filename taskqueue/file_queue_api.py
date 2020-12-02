@@ -225,7 +225,8 @@ class FileQueueAPI(object):
 
   def add_insert_count(self, ct):
     try:
-      N = int(read_file(self.insertions_path))
+      N = read_file(self.insertions_path) # potential multiprocess race condition
+      N = int(N) if N != '' else 0
     except FileNotFoundError:
       N = 0
 
