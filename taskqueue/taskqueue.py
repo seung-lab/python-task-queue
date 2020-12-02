@@ -175,8 +175,6 @@ class TaskQueue(object):
       for task in tasks
     )
 
-
-
     ct = [ 0 ] # using a list instead of a raw number to use pass-by-reference
     ct_lock = threading.Lock()
     def insertfn(batch, ct):
