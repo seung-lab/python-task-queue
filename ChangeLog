@@ -1,6 +1,16 @@
 CHANGES
 =======
 
+2.7.0
+-----
+
+* feat: return number inserted from insert
+* fix: resolve race condition in multiprocess insert counter upload
+* chore: remove whitespace
+* fix: multiprocess insert dying
+* docs: add docstring to @queueable
+* feat: queueable functions (#30)
+
 2.6.0
 -----
 
