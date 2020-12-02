@@ -226,9 +226,16 @@ def test_parallel_insert_all(sqs, protocol):
 
   path = getpath(protocol) 
   tq = TaskQueue(path, green=True)
+  tq.purge()
+
+  if protocol == 'fq':
+    tq.rezero()
 
   tasks = pathos_issue.crt_tasks(5, 20)
   tq.insert(tasks, parallel=2)
+
+  if protocol == 'fq':
+    assert tq.inserted == 30 # oddity of the TaskIterator in crt_tasks
 
   tq.purge()
 

@@ -147,7 +147,10 @@ class TaskQueue(object):
     """
     return [ totask(x) for x in iter(self.api) ]
 
-  def insert(self, tasks, delay_seconds=0, total=None, parallel=1):
+  def insert(
+    self, tasks, delay_seconds=0, 
+    total=None, parallel=1, skip_insert_counter=False
+  ):
     if isinstance(tasks, TaskQueue):
       taskgen = tasks.tasks()
       if not isinstance(taskgen, TaskQueue):
@@ -197,7 +200,12 @@ class TaskQueue(object):
       batch_size=batch_size,
     )
 
-    self.api.add_insert_count(ct[0])
+    if not skip_insert_counter:
+      self.api.add_insert_count(ct[0])
+    return ct[0]
+
+  def add_insert_count(self, ct):
+    self.api.add_insert_count(ct)
 
   def insert_all(self, *args, **kwargs):
     """For backwards compatibility."""
@@ -444,6 +452,9 @@ class LocalTaskQueue(object):
     self.insert(*args, **kwargs)
     self.execute(self.progress)
 
+  def add_insert_count(self, ct):
+    pass
+
   def poll(self, *args, **kwargs):
     pass
 
@@ -498,7 +509,7 @@ def _scatter(sequence, n):
 
 def soloprocess_upload(QueueClass, queue_name, tasks):
   tq = QueueClass(queue_name)
-  tq.insert(tasks)
+  return tq.insert(tasks, skip_insert_counter=True)
 
 error_queue = mp.Queue()
 
@@ -514,10 +525,11 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
 
   def capturing_soloprocess_upload(*args, **kwargs):
     try:
-      soloprocess_upload(*args, **kwargs)
+      return soloprocess_upload(*args, **kwargs)
     except Exception as err:
       print(err)
       error_queue.put(err)
+    return 0
 
   uploadfn = partial(
     capturing_soloprocess_upload, QueueClass, queue_name
@@ -540,7 +552,9 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
   task.__class__.__module__ = '__main__'
 
   with pathos.pools.ProcessPool(parallel) as pool:
-    pool.map(uploadfn, tasks)
+    results = pool.map(uploadfn, tasks)
+
+  QueueClass(queue_name).add_insert_count(sum(results))
 
   task.__class__.__module__ = cls_module
 

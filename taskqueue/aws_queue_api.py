@@ -86,15 +86,18 @@ class AWSTaskQueueAPI(object):
       if len(batch) == 0:
         break
 
-      resp = self.sqs.send_message_batch(
-        QueueUrl=self.qurl,
-        Entries=[ {
+      entries = [ {
           "Id": str(j),
           "MessageBody": json.dumps(task),
           "DelaySeconds": delay_seconds,
-        } for j, task in enumerate(batch) ],
+        } for j, task in enumerate(batch) 
+      ]
+
+      resp = self.sqs.send_message_batch(
+        QueueUrl=self.qurl,
+        Entries=entries,
       )
-      total += 1
+      total += len(entries)
 
     return total
 
