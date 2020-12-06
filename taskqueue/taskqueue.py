@@ -7,6 +7,7 @@ import signal
 import threading
 import time
 import traceback
+import sys
 
 
 import gevent.pool
@@ -347,8 +348,11 @@ class TaskQueue(object):
 
     def sigint_handler(signum, frame):
       global LOOP
-      printv("Interrupted. Exiting after this task completes...")
-      LOOP = False
+      if LOOP:
+        print("Interrupted. Exiting after this task completes. Press Ctrl-C again to exit now.", flush=True)
+        LOOP = False
+      else:
+        sys.exit()
     
     prev_sigint_handler = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, sigint_handler)
