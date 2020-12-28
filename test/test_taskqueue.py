@@ -236,9 +236,9 @@ def test_parallel_insert_all(sqs, protocol):
   tasks = pathos_issue.crt_tasks(5, 20)
   amt = tq.insert(tasks, parallel=2)
 
-  assert amt == 30 # oddity of the TaskIterator in crt_tasks
+  assert amt == 15 
   if protocol == 'fq':
-    assert tq.inserted == 30 # oddity of the TaskIterator in crt_tasks
+    assert tq.inserted == 15
 
   tq.purge()
 

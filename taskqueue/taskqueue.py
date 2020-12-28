@@ -1,5 +1,6 @@
 import copy
 from functools import partial
+import itertools
 import json
 import math
 import random
@@ -7,8 +8,8 @@ import signal
 import threading
 import time
 import traceback
+import types
 import sys
-
 
 import gevent.pool
 import multiprocessing as mp
@@ -66,7 +67,7 @@ class TaskQueue(object):
     self.api = self.initialize_api(self.path, **kwargs)
     self.n_threads = n_threads
     self.green = bool(green)
-    self.progress = bool(progress),
+    self.progress = bool(progress)
 
     if self.green:
       self.check_monkey_patch_status()
@@ -164,7 +165,7 @@ class TaskQueue(object):
     total = totalfn(tasks, total)
 
     if parallel not in (1, False) and total is not None and total > 1:
-      return multiprocess_upload(self.__class__, mkpath(self.path), tasks, parallel=parallel)
+      return multiprocess_upload(self.__class__, mkpath(self.path), tasks, parallel=parallel, total=total)
 
     try:
       batch_size = self.api.batch_size
@@ -195,7 +196,7 @@ class TaskQueue(object):
     schedule_jobs(
       fns=( partial(insertfn, batch, ct) for batch in sip(bodies, batch_size) ),
       concurrency=self.n_threads,
-      progress='Inserting',
+      progress=('Inserting' if self.progress else False),
       total=total,
       green=self.green,
       batch_size=batch_size,
@@ -508,21 +509,13 @@ def _task_execute(task_tuple):
 
 ## Multiprocess Upload
 
-def _scatter(sequence, n):
-  """Scatters elements of ``sequence`` into ``n`` blocks."""
-  chunklen = int(math.ceil(float(len(sequence)) / float(n)))
-
-  return [
-    sequence[ i*chunklen : (i+1)*chunklen ] for i in range(n)
-  ]
-
 def soloprocess_upload(QueueClass, queue_name, tasks):
-  tq = QueueClass(queue_name)
+  tq = QueueClass(queue_name, progress=False)
   return tq.insert(tasks, skip_insert_counter=True)
 
 error_queue = mp.Queue()
 
-def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
+def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None):
   if parallel is True:
     parallel = mp.cpu_count()
   elif parallel <= 0:
@@ -542,7 +535,13 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
   uploadfn = partial(
     capturing_soloprocess_upload, QueueClass, queue_name
   )
-  tasks = _scatter(tasks, parallel)
+
+  if isinstance(tasks, types.GeneratorType):
+    try:
+      task = next(item for item in tasks if item is not None)
+    except StopIteration:
+      return 0
+    tasks = itertools.chain([task], tasks)
 
   # This is a hack to get dill to pickle dynamically
   # generated classes. This is an important use case
@@ -551,21 +550,20 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True):
 
   # https://github.com/uqfoundation/dill/issues/56
 
-  try:
-    task = next(item for item in tasks if item is not None)
-  except StopIteration:
-    return 0
+  # cls_module = task.__class__.__module__
+  # task.__class__.__module__ = '__main__'
 
-  cls_module = task.__class__.__module__
-  task.__class__.__module__ = '__main__'
+  total = totalfn(tasks, total)
+  ct = 0
+  with tqdm(desc="Upload", total=total) as pbar:
+    with pathos.pools.ProcessPool(parallel) as pool:
+      for num_inserted in pool.imap(uploadfn, sip(tasks, 2000)):
+        pbar.update(num_inserted)
+        ct += num_inserted
 
-  with pathos.pools.ProcessPool(parallel) as pool:
-    results = pool.map(uploadfn, tasks)
-
-  ct = sum(results)
   QueueClass(queue_name).add_insert_count(ct)
 
-  task.__class__.__module__ = cls_module
+  # task.__class__.__module__ = cls_module
 
   if not error_queue.empty():
     errors = []
