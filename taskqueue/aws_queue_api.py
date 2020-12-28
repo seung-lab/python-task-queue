@@ -163,7 +163,7 @@ class AWSTaskQueueAPI(object):
       pass
 
   def tally(self):
-    raise NotImplementedError("Not supported for SQS.")
+    pass
 
   def purge(self):
     # This is more efficient, but it kept freezing
