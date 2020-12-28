@@ -554,6 +554,12 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
   # task.__class__.__module__ = '__main__'
 
   total = totalfn(tasks, total)
+
+  block_size = 2000
+  if total is not None and (total / parallel) < block_size:
+    if total > 500:
+      block_size = int(math.ceil(total / parallel))
+
   ct = 0
   with tqdm(desc="Upload", total=total) as pbar:
     with pathos.pools.ProcessPool(parallel) as pool:
