@@ -364,7 +364,10 @@ class FileQueueAPI(object):
     try:
       fd = read_lock_file(open(movements_file_path, 'rt'))
     except FileNotFoundError:
-      return
+      # if it doesn't exist we still want to count this 
+      # as a delete request succeeded b/c its purpose was 
+      # achieved and the progress bar should increment.
+      return 1 
 
     filenames = fd.read().split('\n')
     fd.close()
@@ -385,6 +388,8 @@ class FileQueueAPI(object):
       os.remove(movements_file_path)
     except FileNotFoundError:
       pass
+
+    return 1
 
   def tally(self):
     with open(self.completions_path, 'ba') as f:

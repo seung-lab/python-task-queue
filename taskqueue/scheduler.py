@@ -25,9 +25,9 @@ def schedule_threaded_jobs(
   
   def updatefn(fn):
     def realupdatefn(iface):
-      res = fn()
-      pbar.update(batch_size)
-      results.append(res)
+      ct = fn()
+      pbar.update(ct)
+      results.append(ct) # cPython list append is thread safe
     return realupdatefn
 
   with ThreadedQueue(n_threads=concurrency) as tq:

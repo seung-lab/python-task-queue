@@ -180,31 +180,22 @@ class TaskQueue(object):
       for task in tasks
     )
 
-    ct = [ 0 ] # using a list instead of a raw number to use pass-by-reference
-    ct_lock = threading.Lock()
-    def insertfn(batch, ct):
-      try:
-        # Set incr = 0 first because 
-        # UnboundLocalError: local variable 'incr' referenced before assignment 
-        # when e.g. OSError: [Errno 28] No space left on device
-        incr = 0 
-        incr = self.api.insert(batch, delay_seconds) 
-      finally:
-        with ct_lock:
-          ct[0] += incr
+    def insertfn(batch):
+        return self.api.insert(batch, delay_seconds) 
     
-    schedule_jobs(
-      fns=( partial(insertfn, batch, ct) for batch in sip(bodies, batch_size) ),
+    cts = schedule_jobs(
+      fns=( partial(insertfn, batch) for batch in sip(bodies, batch_size) ),
       concurrency=self.n_threads,
       progress=('Inserting' if self.progress else False),
       total=total,
       green=self.green,
       batch_size=batch_size,
     )
+    cts = sum(cts)
 
     if not skip_insert_counter:
-      self.api.add_insert_count(ct[0])
-    return ct[0]
+      self.api.add_insert_count(cts)
+    return cts
 
   def add_insert_count(self, ct):
     self.api.add_insert_count(ct)
