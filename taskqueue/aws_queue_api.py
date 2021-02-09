@@ -162,6 +162,8 @@ class AWSTaskQueueAPI(object):
     except botocore.exceptions.ClientError as err:
       pass
 
+    return 1
+
   def tally(self):
     pass
 

@@ -3,6 +3,8 @@ from functools import partial
 import itertools
 import json
 import math
+import os
+import platform
 import random
 import signal
 import threading
@@ -180,31 +182,22 @@ class TaskQueue(object):
       for task in tasks
     )
 
-    ct = [ 0 ] # using a list instead of a raw number to use pass-by-reference
-    ct_lock = threading.Lock()
-    def insertfn(batch, ct):
-      try:
-        # Set incr = 0 first because 
-        # UnboundLocalError: local variable 'incr' referenced before assignment 
-        # when e.g. OSError: [Errno 28] No space left on device
-        incr = 0 
-        incr = self.api.insert(batch, delay_seconds) 
-      finally:
-        with ct_lock:
-          ct[0] += incr
+    def insertfn(batch):
+        return self.api.insert(batch, delay_seconds) 
     
-    schedule_jobs(
-      fns=( partial(insertfn, batch, ct) for batch in sip(bodies, batch_size) ),
+    cts = schedule_jobs(
+      fns=( partial(insertfn, batch) for batch in sip(bodies, batch_size) ),
       concurrency=self.n_threads,
       progress=('Inserting' if self.progress else False),
       total=total,
       green=self.green,
       batch_size=batch_size,
     )
+    cts = sum(cts)
 
     if not skip_insert_counter:
-      self.api.add_insert_count(ct[0])
-    return ct[0]
+      self.api.add_insert_count(cts)
+    return cts
 
   def add_insert_count(self, ct):
     self.api.add_insert_count(ct)
@@ -560,6 +553,13 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
     if total > 500:
       block_size = int(math.ceil(total / parallel))
 
+  # Fix for MacOS which can segfault due to 
+  # urllib calling libdispatch which is not fork-safe
+  # https://bugs.python.org/issue30385
+  no_proxy = os.environ.get("no_proxy", "")
+  if platform.system().lower() == "darwin":
+    os.environ["no_proxy"] = "*"
+
   ct = 0
   with tqdm(desc="Upload", total=total) as pbar:
     with pathos.pools.ProcessPool(parallel) as pool:
@@ -569,6 +569,8 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
 
   QueueClass(queue_name).add_insert_count(ct)
 
+  if platform.system().lower() == "darwin":
+    os.environ["no_proxy"] = no_proxy
   # task.__class__.__module__ = cls_module
 
   if not error_queue.empty():

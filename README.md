@@ -15,7 +15,9 @@ The task queue uses your CloudVolume secrets located in `$HOME/.cloudvolume/secr
 
 ## Usage
 
-As of version 2.7.0, there are two ways to create a queueable task. The new way is simpler and probably preferred.
+As of version 2.7.0, there are two ways to create a queueable task. The new way is simpler and probably preferred. 
+
+*MacOS Only: Note that proxy servers are disabled for parallel operation due to libdispatch being not fork-safe.*
 
 ### New School: Queueable Functions
 
