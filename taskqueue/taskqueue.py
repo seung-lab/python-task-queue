@@ -3,6 +3,8 @@ from functools import partial
 import itertools
 import json
 import math
+import os
+import platform
 import random
 import signal
 import threading
@@ -551,6 +553,13 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
     if total > 500:
       block_size = int(math.ceil(total / parallel))
 
+  # Fix for MacOS which can segfault due to 
+  # urllib calling libdispatch which is not fork-safe
+  # https://bugs.python.org/issue30385
+  no_proxy = os.environ.get("no_proxy", "")
+  if platform.system().lower() == "darwin":
+    os.environ["no_proxy"] = "*"
+
   ct = 0
   with tqdm(desc="Upload", total=total) as pbar:
     with pathos.pools.ProcessPool(parallel) as pool:
@@ -560,6 +569,8 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
 
   QueueClass(queue_name).add_insert_count(ct)
 
+  if platform.system().lower() == "darwin":
+    os.environ["no_proxy"] = no_proxy
   # task.__class__.__module__ = cls_module
 
   if not error_queue.empty():
