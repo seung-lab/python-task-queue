@@ -5,7 +5,7 @@ import types
 import boto3
 import botocore.errorfactory
 
-from .lib import toiter, sip
+from .lib import toiter, sip, jsonify
 from .secrets import aws_credentials
 from .secrets import (
   AWS_DEFAULT_REGION
@@ -88,7 +88,7 @@ class AWSTaskQueueAPI(object):
 
       entries = [ {
           "Id": str(j),
-          "MessageBody": json.dumps(task),
+          "MessageBody": jsonify(task),
           "DelaySeconds": delay_seconds,
         } for j, task in enumerate(batch) 
       ]
