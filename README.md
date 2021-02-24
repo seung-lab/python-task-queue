@@ -96,7 +96,7 @@ This will load the queue with 1000 print tasks then execute them across five pro
 
 ```python
 # import gevent.monkey
-# gevent.monkey.patch_all()
+# gevent.monkey.patch_all(thread=False)
 from taskqueue import TaskQueue
 
 # region is SQS specific, green means cooperative threading
