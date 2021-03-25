@@ -12,11 +12,11 @@ import time
 
 import tenacity
 
-from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip, toabs
+from .lib import mkdir, jsonify, toiter, STRING_TYPES, sip, toabs, first
 
 retry = tenacity.retry(
-  reraise=True, 
-  stop=tenacity.stop_after_attempt(4), 
+  reraise=True,
+  stop=tenacity.stop_after_attempt(4),
   wait=tenacity.wait_random_exponential(0.5, 60.0),
 )
 
@@ -31,8 +31,8 @@ def read_file(path, mode='rt', lock=False, block=False):
 
 @retry
 def write_file(
-  path, file, mode='wt', 
-  fsync=False, lock=False, 
+  path, file, mode='wt',
+  fsync=False, lock=False,
   block=False
 ):
   f = open(path, mode)
@@ -55,7 +55,7 @@ def move_file(src_path, dest_path):
 @retry
 def write_lock_file(fd, block=False):
   """
-  Locks are bound to processes. A terminated process unlocks. 
+  Locks are bound to processes. A terminated process unlocks.
   Non-blocking, raises OSError if unable to obtain a lock.
 
   Note that any closing of a file descriptor for the locked file
@@ -64,7 +64,7 @@ def write_lock_file(fd, block=False):
   """
 
   # https://docs.python.org/3/library/fcntl.html
-  # "On at least some systems, LOCK_EX can only be used if the file 
+  # "On at least some systems, LOCK_EX can only be used if the file
   # descriptor refers to a file opened for writing."
   # Locks: LOCK_EX (exclusive), LOCK_SH (shared), LOCK_NB (non-blocking)
   mode = fcntl.LOCK_EX
@@ -77,7 +77,7 @@ def write_lock_file(fd, block=False):
 @retry
 def read_lock_file(fd, block=False):
   """
-  Locks are bound to processes. A terminated process unlocks. 
+  Locks are bound to processes. A terminated process unlocks.
   Non-blocking, raises OSError if unable to obtain a lock.
 
   Note that any closing of a file descriptor for the locked file
@@ -86,7 +86,7 @@ def read_lock_file(fd, block=False):
   """
 
   # https://docs.python.org/3/library/fcntl.html
-  # "On at least some systems, LOCK_EX can only be used if the file 
+  # "On at least some systems, LOCK_EX can only be used if the file
   # descriptor refers to a file opened for writing."
   # Locks: LOCK_EX (exclusive), LOCK_SH (shared), LOCK_NB (non-blocking)
   mode = fcntl.LOCK_SH
@@ -126,40 +126,40 @@ def nowfn():
 
 class FileQueueAPI(object):
   """
-  University clusters and supercomputers often cannot access SQS easily 
+  University clusters and supercomputers often cannot access SQS easily
   but have access to a common file system. It would be a pain to have t
-  o set up a RabbitMQ instance or similar process on each cluster we 
-  get access to, so it would be ideal to have a queue system that just 
+  o set up a RabbitMQ instance or similar process on each cluster we
+  get access to, so it would be ideal to have a queue system that just
   runs off the filesystem.
 
   We need the following properties from our queue:
 
     Serverless
     Durable - No losses from power outages and process crashes.
-    Supports Verbs - queue create, queue delete, task create, 
-      time limited task lease, task delete, task lease extend, 
+    Supports Verbs - queue create, queue delete, task create,
+      time limited task lease, task delete, task lease extend,
       and reset tasks leases.
     Parallel Safe
-    Recirculating Tasks - If a process fails, eventually the 
+    Recirculating Tasks - If a process fails, eventually the
       task will be picked up by another one.
     Supports millions of tasks.
-    Can be operated by a pipeline technician without help 
+    Can be operated by a pipeline technician without help
       (or need onerous approvals) from a cluster administrator.
 
-  File Queues in principle fulfill the first two properties as the 
-  server is the filesystem and files do not disappear on power loss 
-  or process crash. On journaling filesystems, the files do not even 
-  become corrupted on power loss in the middle of writing. Filesystems 
-  support millions of files in a single directory, but certain operations 
-  like listing become unusable. Properties 3 through 6 will require 
-  careful design. We anticipate that these queues can be run from 
-  userland and require no special approvals to be used unless the queues 
-  are very large, in which case the entire job will likely need special 
+  File Queues in principle fulfill the first two properties as the
+  server is the filesystem and files do not disappear on power loss
+  or process crash. On journaling filesystems, the files do not even
+  become corrupted on power loss in the middle of writing. Filesystems
+  support millions of files in a single directory, but certain operations
+  like listing become unusable. Properties 3 through 6 will require
+  careful design. We anticipate that these queues can be run from
+  userland and require no special approvals to be used unless the queues
+  are very large, in which case the entire job will likely need special
   approval anyway.
 
-  With respect to the verbs specified, all should be familiar from SQS 
-  with one exception: reset task leases is new and is extremely useful 
-  for resetting a job that has partially run but crashed when the lease 
+  With respect to the verbs specified, all should be familiar from SQS
+  with one exception: reset task leases is new and is extremely useful
+  for resetting a job that has partially run but crashed when the lease
   time is very long.
   """
   def __init__(self, path):
@@ -236,8 +236,8 @@ class FileQueueAPI(object):
 
   @retry
   def rezero(self):
-    # no sense acquiring a lock for completions since other writers aren't 
-    write_file(self.completions_path, b'', mode='bw+', fsync=True) 
+    # no sense acquiring a lock for completions since other writers aren't
+    write_file(self.completions_path, b'', mode='bw+', fsync=True)
     write_file(self.insertions_path, '0', mode='tw+', fsync=True, lock=True, block=True)
 
   @retry
@@ -306,7 +306,7 @@ class FileQueueAPI(object):
 
     try:
       move_file(
-        os.path.join(self.queue_path, filename), 
+        os.path.join(self.queue_path, filename),
         new_filepath
       )
     except FileNotFoundError:
@@ -364,15 +364,15 @@ class FileQueueAPI(object):
     try:
       fd = read_lock_file(open(movements_file_path, 'rt'))
     except FileNotFoundError:
-      # if it doesn't exist we still want to count this 
-      # as a delete request succeeded b/c its purpose was 
+      # if it doesn't exist we still want to count this
+      # as a delete request succeeded b/c its purpose was
       # achieved and the progress bar should increment.
-      return 1 
+      return 1
 
     filenames = fd.read().split('\n')
     fd.close()
 
-    fd = write_lock_file(open(movements_file_path, 'wt'))    
+    fd = write_lock_file(open(movements_file_path, 'wt'))
 
     for filename in filenames:
       if filename == '':
@@ -397,7 +397,7 @@ class FileQueueAPI(object):
 
   def purge(self):
     all_files = itertools.chain(
-      os.scandir(self.queue_path), 
+      os.scandir(self.queue_path),
       os.scandir(self.movement_path)
     )
     for file in all_files:
@@ -422,8 +422,8 @@ class FileQueueAPI(object):
 
   def __len__(self):
     return functools.reduce(operator.add, ( 1 for f in os.scandir(self.queue_path) ), 0)
-      
-      
+
+
 
 
 
