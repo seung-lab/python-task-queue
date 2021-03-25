@@ -1,6 +1,14 @@
 CHANGES
 =======
 
+2.8.4
+-----
+
+* chore: update ChangeLog
+* test: add tests for is\_empty
+* fix: missing import of "first" from lib (#33)
+* docs: update README.md
+
 2.8.3
 -----
 
