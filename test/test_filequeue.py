@@ -114,5 +114,21 @@ def test_enumerating_tasks():
   assert hello == 10
   assert world == 10
 
+def test_is_empty():
+  tq = TaskQueue(FILE_QURL)
+  tq.purge()
+
+  assert tq.is_empty() == True
+
+  tq.insert(PrintTask("hello"))
+
+  assert tq.is_empty() == False
+
+  task = tq.lease()
+  tq.delete(task)
+
+  assert tq.is_empty() == True
+
+
 
 
