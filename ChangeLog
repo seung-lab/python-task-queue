@@ -1,6 +1,35 @@
 CHANGES
 =======
 
+2.8.3
+-----
+
+* release(2.8.3): upload numpy objects to SQS + fixes segfault on Mac
+* fix(gha): install requirements\_dev.txt
+* chore: remove travis CI
+* Create python-package.yml
+* fix: progress bar overestimate (#32)
+* fix: accept numpy arrays for JSON conversion on SQS
+
+2.8.2
+-----
+
+* release(2.8.2): smoother parallel upload progress bar + fixes
+* feat: smoother parallel upload (#31)
+
+2.8.1
+-----
+
+* release(2.8.1): fix for sqs
+* fix: igneous sets tally to True by default which crashes sqs
+
+2.8.0
+-----
+
+* release(2.8.0): ctrl-c twice to immediately exit poll
+* feat: ctrl-c twice to immediately exit poll
+* docs: fix spelling error
+
 2.7.0
 -----
 
