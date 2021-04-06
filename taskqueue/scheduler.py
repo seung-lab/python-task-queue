@@ -9,7 +9,7 @@ DEFAULT_THREADS = 20
 
 def schedule_threaded_jobs(
     fns, concurrency=DEFAULT_THREADS, 
-    progress=None, total=None, batch_size=1
+    progress=None, total=None
   ):
   
   if total is None:
@@ -38,7 +38,7 @@ def schedule_threaded_jobs(
 
 def schedule_green_jobs(
     fns, concurrency=DEFAULT_THREADS, 
-    progress=None, total=None, batch_size=1
+    progress=None, total=None
   ):
   import gevent.pool
 
@@ -51,29 +51,41 @@ def schedule_green_jobs(
   desc = progress if isinstance(progress, STRING_TYPES) else None
 
   pbar = tqdm(total=total, desc=desc, disable=(not progress))
+
   results = []
-  
+  exceptions = []
+
+  def add_exception(greenlet):
+    nonlocal exceptions
+    try:
+      greenlet.get()
+    except Exception as err:
+      exceptions.append(err)
+
   def updatefn(fn):
     def realupdatefn():
-      res = fn()
-      pbar.update(batch_size)
-      results.append(res)
+      ct = fn()
+      pbar.update(ct)
+      results.append(ct) # cPython list append is thread safe
     return realupdatefn
 
   pool = gevent.pool.Pool(concurrency)
   for fn in fns:
-    pool.spawn( updatefn(fn) )
+    greenlet = pool.spawn( updatefn(fn) )
+    greenlet.link_exception(add_exception)
 
   pool.join()
   pool.kill()
   pbar.close()
 
+  if exceptions:
+    raise_multiple(exceptions)
+
   return results
 
 def schedule_jobs(
     fns, concurrency=DEFAULT_THREADS, 
-    progress=None, total=None, green=False,
-    batch_size=1
+    progress=None, total=None, green=False
   ):
   """
   Given a list of functions, execute them concurrently until
@@ -93,8 +105,8 @@ def schedule_jobs(
     return [ fn() for fn in tqdm(fns, disable=(not progress or total == 1), desc=progress) ]
 
   if green:
-    return schedule_green_jobs(fns, concurrency, progress, total, batch_size)
+    return schedule_green_jobs(fns, concurrency, progress, total)
 
-  return schedule_threaded_jobs(fns, concurrency, progress, total, batch_size)
+  return schedule_threaded_jobs(fns, concurrency, progress, total)
 
 
