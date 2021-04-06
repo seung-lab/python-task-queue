@@ -191,7 +191,6 @@ class TaskQueue(object):
       progress=('Inserting' if self.progress else False),
       total=total,
       green=self.green,
-      batch_size=batch_size,
     )
     cts = sum(cts)
 
@@ -584,5 +583,13 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
 
   return ct
 
+# c/o https://stackoverflow.com/questions/12826291/raise-two-errors-at-the-same-time
+def raise_multiple(errors):
+  if not errors:
+    return
+  try:
+    raise errors.pop()
+  finally:
+    raise_multiple(errors)
 
 
