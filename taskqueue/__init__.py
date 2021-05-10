@@ -5,4 +5,4 @@ from .taskqueue import (
 )
 from .queueablefns import queueable, FunctionTask
 
-__version__ = '2.8.3'
+__version__ = '2.8.6'
