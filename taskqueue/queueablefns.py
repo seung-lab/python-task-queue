@@ -38,7 +38,7 @@ def func2task(fn, ident):
     rawfn = rawfn.func
 
   if not argsokay(rawfn, args, kwargs):
-    raise ValueError("{} didn't get valid arguments. Got: {}, {}. Expected: {}".format(
+    raise TypeError("{} didn't get valid arguments. Got: {}, {}. Expected: {}".format(
       rawfn, args, kwargs, inspect.getfullargspec(rawfn)
     ))
 
@@ -116,23 +116,11 @@ def jsonifyable(obj):
   return obj
 
 def argsokay(fn, args, kwargs):
-  spec = inspect.getfullargspec(fn)
-
-  sargs = spec.args or []
-  sdefaults = spec.defaults or []
-
-  kwargct = 0
-  sargs = set(sargs)
-  for name in kwargs.keys():
-    kwargct += (name in sargs)
-
-  if not (len(sargs) - len(sdefaults) <= len(args) + kwargct <= len(sargs)):
+  sig = inspect.signature(fn)
+  try:
+    sig.bind(*args, **kwargs)
+  except TypeError:
     return False
-
-  for name in kwargs.keys():
-    if not (name in sargs) and not (name in spec.kwonlyargs):
-      return False
-
   return True
 
 def queueable(fn):

@@ -78,6 +78,26 @@ def test_task_creation_fns():
   fn = partial(partial(sumfn, 1), b=2)
   assert func2task(fn, -1)() == 3
 
+  task = partial(printfn, not_a_real_arg="hello world")
+  try:
+    task = totask(task)
+    assert False
+  except TypeError:
+    pass
+
+  try:
+    task = totask(printfn) # not enough args
+    assert False
+  except TypeError:
+    pass
+
+  task = partial(printfn, "hello world", "omg")
+  try:
+    task = totask(task)
+    assert False
+  except TypeError:
+    pass
+
   try:
     FunctionTask(("fake", "fake"), [], {}, None)()
     assert False, "Should not have been able to call this function."
