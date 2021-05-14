@@ -418,7 +418,13 @@ class FileQueueAPI(object):
       with open(path, 'rt') as f:
         return f.read()
 
-    return ( read(f.path) for f in os.scandir(self.queue_path) )
+    for f in os.scandir(self.queue_path):
+      try:
+        yield read(f.path)
+      # It's possible for a task to have been
+      # deleted in between scanning and reading.
+      except FileNotFoundError:
+        continue
 
   def __len__(self):
     return functools.reduce(operator.add, ( 1 for f in os.scandir(self.queue_path) ), 0)
