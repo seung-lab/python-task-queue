@@ -68,7 +68,11 @@ def release(queuepath):
 def copy(src, dest):
   """
   Copy the contents of a queue to another
-  service or location.
+  service or location. Do not run this
+  process while a queue is being worked.
+
+  Currently sqs queues are not copiable,
+  but you can copy an fq to sqs.
   """
   src = normalize_path(src)
   dest = normalize_path(dest)
