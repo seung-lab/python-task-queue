@@ -61,3 +61,22 @@ def status(queuepath):
 def release(queuepath):
   """Release all tasks from their leases."""
   TaskQueue(normalize_path(queuepath)).release_all()
+
+@main.command()
+@click.argument("src")
+@click.argument("dest")
+def copy(src, dest):
+  """
+  Copy the contents of a queue to another
+  service or location.
+  """
+  src = normalize_path(src)
+  dest = normalize_path(dest)
+
+  tqd = TaskQueue(dest)
+  tqs = TaskQueue(src)
+
+  tqd.insert(tqs)
+
+
+
