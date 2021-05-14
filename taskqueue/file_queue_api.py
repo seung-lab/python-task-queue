@@ -408,7 +408,7 @@ class FileQueueAPI(object):
 
   def is_empty(self):
     try:
-      first(iter(self))
+      first(os.scandir(self.queue_path))
       return False
     except StopIteration:
       return True
