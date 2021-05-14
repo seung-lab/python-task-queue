@@ -65,7 +65,7 @@ def release(queuepath):
 @main.command()
 @click.argument("src")
 @click.argument("dest")
-def copy(src, dest):
+def cp(src, dest):
   """
   Copy the contents of a queue to another
   service or location. Do not run this
