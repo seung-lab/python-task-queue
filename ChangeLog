@@ -1,6 +1,21 @@
 CHANGES
 =======
 
+2.8.7
+-----
+
+* release(2.8.7): more robust is\_empty for FileQueue
+* fix(fq): iter dies if file deleted between scan and read
+* fix: no need for is\_empty to actually read the files
+
+2.8.6
+-----
+
+* release(2.8.6): more robust test for queueable function arguments
+* fix(queuable): more robust check for correct arguments
+* fix: green threads throw exceptions properly (#34)
+* chore: update changelog
+
 2.8.4
 -----
 
