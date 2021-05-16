@@ -2,7 +2,7 @@
 
 # python-task-queue
 
-This package provides a client and system for generating, uploading, leasing, and executing dependency free tasks both locally and in the cloud using AWS SQS or on a single machine or cluster with a common file system using file based queues.
+This package provides a client and system for generating, uploading, leasing, and executing dependency free tasks both locally and in the cloud using AWS SQS or on a single machine or cluster with a common file system using file based queues. Of note, file queue requires no setup or queue service and can be used in a distributed fashion on a network filesystem.
 
 ## Installation
 
