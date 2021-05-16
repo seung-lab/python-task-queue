@@ -1,6 +1,15 @@
 CHANGES
 =======
 
+2.9.0
+-----
+
+* release(2.9.0): adds cp command to ptq
+* refactor: rename copy to cp
+* docs: describe restrictions on copying sqs
+* chore: update ChangeLog
+* feat(cli): add copy to ptq
+
 2.8.7
 -----
 
