@@ -1,6 +1,16 @@
 CHANGES
 =======
 
+2.10.0
+------
+
+* release(2.10.0): adds mv command to ptq
+* feat(cli): implement mv command
+* feat: better error message for cp
+* feat(cli): support mv command
+* chore: update ChangeLog
+* docs: mention that filequeue doesn't need a server
+
 2.9.0
 -----
 

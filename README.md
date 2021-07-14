@@ -209,6 +209,8 @@ As of 2.5.0, we now bundle a command line tool `ptq` to make managing running Fi
 ptq status fq://./my-queue # prints vital statistics
 ptq release fq://./my-queue # releases all tasks from their lease
 ptq rezero fq://./my-queue # resets statistics to zero
+ptq cp fq://./my-queue sqs://my-cloud-queue # copy a queue (no copies of sqs)
+ptq mv sqs://my-cloud-queue fq://./my-queue # move a queue (all supported)
 ```
 
 ## Motivation
