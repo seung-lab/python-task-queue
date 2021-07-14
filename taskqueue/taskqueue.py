@@ -245,9 +245,10 @@ class TaskQueue(object):
     total = totalfn(task_id, total)
 
     def deltask(tid):
-      self.api.delete(totaskid(tid))
+      num_deleted = self.api.delete(totaskid(tid))
       if tally:
         self.api.tally()
+      return num_deleted
 
     schedule_jobs(
       fns=( partial(deltask, tid) for tid in task_id ),

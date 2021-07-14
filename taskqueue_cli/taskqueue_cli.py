@@ -1,6 +1,7 @@
 import os
 
 import click
+from tqdm import tqdm
 
 from taskqueue import TaskQueue, __version__, QueueEmptyError
 from taskqueue.lib import toabs
@@ -102,17 +103,20 @@ def mv(src, dest):
   src = normalize_path(src)
   dest = normalize_path(dest)
 
-  tqd = TaskQueue(dest)
-  tqs = TaskQueue(src)
+  tqd = TaskQueue(dest, progress=False)
+  tqs = TaskQueue(src, progress=False)
 
-  while True:
-    try:
-      tasks = tqs.lease(num_tasks=10, seconds=10)
-    except QueueEmptyError:
-      break
+  total = tqs.enqueued
+  with tqdm(total=total, desc="Moving") as pbar:
+    while True:
+      try:
+        tasks = tqs.lease(num_tasks=10, seconds=10)
+      except QueueEmptyError:
+        break
 
-    tqd.insert(tasks)
-    tqs.delete(tasks)
+      tqd.insert(tasks)
+      tqs.delete(tasks)
+      pbar.update(len(tasks))
 
 
 
