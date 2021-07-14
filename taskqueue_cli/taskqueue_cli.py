@@ -2,7 +2,7 @@ import os
 
 import click
 
-from taskqueue import TaskQueue, __version__
+from taskqueue import TaskQueue, __version__, QueueEmptyError
 from taskqueue.lib import toabs
 from taskqueue.paths import get_protocol
 
@@ -72,7 +72,8 @@ def cp(src, dest):
   process while a queue is being worked.
 
   Currently sqs queues are not copiable,
-  but you can copy an fq to sqs.
+  but you can copy an fq to sqs. The mv
+  command supports sqs queues.
   """
   src = normalize_path(src)
   dest = normalize_path(dest)
@@ -81,6 +82,37 @@ def cp(src, dest):
   tqs = TaskQueue(src)
 
   tqd.insert(tqs)
+
+@main.command()
+@click.argument("src")
+@click.argument("dest")
+def mv(src, dest):
+  """
+  Moves the contents of a queue to another
+  service or location. Do not run this
+  process while a queue is being worked.
+
+  Moving an sqs queue to a file queue
+  may result in duplicated tasks.
+  """
+  src = normalize_path(src)
+  dest = normalize_path(dest)
+
+  tqd = TaskQueue(dest)
+  tqs = TaskQueue(src)
+
+  while True:
+    try:
+      tasks = tqs.lease(num_tasks=10, seconds=10)
+    except QueueEmptyError:
+      break
+
+    tqd.insert(tasks)
+    tqs.delete(tasks)
+
+
+
+
 
 
 

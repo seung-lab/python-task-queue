@@ -183,7 +183,7 @@ class TaskQueue(object):
     )
 
     def insertfn(batch):
-        return self.api.insert(batch, delay_seconds) 
+      return self.api.insert(batch, delay_seconds) 
     
     cts = schedule_jobs(
       fns=( partial(insertfn, batch) for batch in sip(bodies, batch_size) ),
@@ -219,7 +219,7 @@ class TaskQueue(object):
   def release_all(self):
     return self.api.release_all()
 
-  def lease(self, seconds=600, num_tasks=1):
+  def lease(self, seconds=600, num_tasks=1, wait_sec=None):
     """
     Acquires a lease on the topmost N unowned tasks in the specified queue.
     Required query parameters: leaseSecs, numTasks
@@ -229,7 +229,7 @@ class TaskQueue(object):
     if seconds < 0:
       raise ValueError("lease seconds must be >= 0. Got: " + str(seconds))
 
-    tasks = self.api.lease(seconds, num_tasks)
+    tasks = self.api.lease(seconds, num_tasks, wait_sec)
 
     if not len(tasks):
       raise QueueEmptyError()
@@ -562,7 +562,7 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
   ct = 0
   with tqdm(desc="Upload", total=total) as pbar:
     with pathos.pools.ProcessPool(parallel) as pool:
-      for num_inserted in pool.imap(uploadfn, sip(tasks, 2000)):
+      for num_inserted in pool.imap(uploadfn, sip(tasks, block_size)):
         pbar.update(num_inserted)
         ct += num_inserted
 

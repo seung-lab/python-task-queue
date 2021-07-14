@@ -116,7 +116,10 @@ class AWSTaskQueueAPI(object):
   def release_all(self):
     raise NotImplementedError()
 
-  def _request(self, num_tasks, visibility_timeout):
+  def lease(self, seconds, num_tasks=1, wait_sec=20):
+    if wait_sec is None:
+      wait_sec = 20
+
     resp = self.sqs.receive_message(
       QueueUrl=self.qurl,
       AttributeNames=[
@@ -126,8 +129,8 @@ class AWSTaskQueueAPI(object):
       MessageAttributeNames=[
         'All'
       ],
-      VisibilityTimeout=visibility_timeout,
-      WaitTimeSeconds=20,
+      VisibilityTimeout=seconds,
+      WaitTimeSeconds=wait_sec,
     )
         
     if 'Messages' not in resp:
@@ -139,11 +142,6 @@ class AWSTaskQueueAPI(object):
       task['id'] = msg['ReceiptHandle']
       tasks.append(task)
     return tasks
-
-  def lease(self, seconds, num_tasks=1):
-    if num_tasks > 1:
-      raise ValueError("This library (not boto/SQS) only supports fetching one task at a time. Requested: {}.".format(num_tasks))
-    return self._request(num_tasks, seconds)
 
   def delete(self, task):
     if type(task) == str:
@@ -175,13 +173,13 @@ class AWSTaskQueueAPI(object):
 
     while self.enqueued:
       # visibility_timeout must be > 0 for delete to work
-      tasks = self._request(num_tasks=10, visibility_timeout=10)
+      tasks = self.lease(num_tasks=10, seconds=10)
       for task in tasks:
         self.delete(task)
     return self
     
   def __iter__(self):
-    return iter(self._request(num_tasks=10, visibility_timeout=0))
+    return iter(self.lease(num_tasks=10, seconds=0))
       
 
 

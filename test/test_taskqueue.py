@@ -9,7 +9,11 @@ from six.moves import range
 import pytest
 
 import taskqueue
-from taskqueue import queueable, FunctionTask, RegisteredTask, TaskQueue, MockTask, PrintTask, LocalTaskQueue
+from taskqueue import (
+  queueable, FunctionTask, RegisteredTask, 
+  TaskQueue, MockTask, PrintTask, LocalTaskQueue,
+  QueueEmptyError
+)
 from taskqueue.paths import ExtractedPath, mkpath
 from taskqueue.queueables import totask
 from taskqueue.queueablefns import tofunc, UnregisteredFunctionError, func2task
@@ -153,6 +157,28 @@ def test_get(sqs, protocol):
   for i in range(n_inserts):
     t = tq.lease()
     tq.delete(t)
+
+def test_lease(sqs):
+  path = getpath("sqs") 
+  tq = TaskQueue(path, n_threads=0)
+
+  n_inserts = 20
+  tq.purge()
+  tq.insert(( PrintTask(str(x)) for x in range(n_inserts) ))
+
+  tasks = tq.lease(num_tasks=10, wait_sec=0)
+  assert len(tasks) == 10
+  tq.delete(tasks)
+
+  tasks = tq.lease(num_tasks=10, wait_sec=0)
+  assert len(tasks) == 10
+  tq.delete(tasks)
+
+  try:
+    tasks = tq.lease(num_tasks=10, wait_sec=0)
+    assert False
+  except QueueEmptyError:
+    pass
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
 def test_single_threaded_insertion(sqs, protocol):

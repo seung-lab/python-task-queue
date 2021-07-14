@@ -2,6 +2,7 @@ import fcntl
 import functools
 import itertools
 import json
+import math
 import operator
 import os.path
 import random
@@ -320,7 +321,10 @@ class FileQueueAPI(object):
 
     return json.loads(read_file(new_filepath))
 
-  def lease(self, seconds, num_tasks):
+  def lease(self, seconds, num_tasks, wait_sec=None):
+    if wait_sec is None:
+      wait_sec = 0
+
     def fmt(direntry):
       filename = direntry.name
       timestamp, _ = filename.split('--')
@@ -354,7 +358,24 @@ class FileQueueAPI(object):
       if lessee is not None:
         leases.append(lessee)
 
-    return leases
+    wait_leases = []
+    if wait_sec > 0 and len(leases) < num_tasks:
+      # Add a constant b/c this will cascade into shorter and 
+      # shorter checks as wait_sec shrinks and we don't
+      # want hundreds of workers to accidently synchronize
+      sleep_amt = random.random() * (wait_sec + 1)
+
+      # but we still want to guarantee that wait_sec is not
+      # exceeded.
+      sleep_amt = min(sleep_amt, wait_sec)
+      time.sleep(sleep_amt)
+      wait_leases = self.lease(
+        seconds, 
+        num_tasks - len(leases), 
+        wait_sec - sleep_amt
+      )
+
+    return leases + wait_leases
 
   @retry
   def delete(self, task):
