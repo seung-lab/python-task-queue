@@ -78,6 +78,10 @@ def cp(src, dest):
   src = normalize_path(src)
   dest = normalize_path(dest)
 
+  if get_protocol(src) == "sqs":
+    print("ptq: cp does not support sqs:// as a source.")
+    return
+
   tqd = TaskQueue(dest)
   tqs = TaskQueue(src)
 
