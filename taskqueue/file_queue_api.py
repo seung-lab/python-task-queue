@@ -416,7 +416,9 @@ class FileQueueAPI(object):
     with open(self.completions_path, 'ba') as f:
       f.write(b'\0')
 
-  def purge(self):
+  def purge(self, native=False):
+    # native only has meaning for SQS for now
+    # but we have to accept it as a parameter.
     all_files = itertools.chain(
       os.scandir(self.queue_path),
       os.scandir(self.movement_path)
@@ -426,6 +428,8 @@ class FileQueueAPI(object):
         os.remove(file.path)
       except FileNotFoundError:
         pass
+
+    self.rezero()
 
   def is_empty(self):
     try:

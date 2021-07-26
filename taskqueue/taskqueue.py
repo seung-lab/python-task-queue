@@ -258,10 +258,10 @@ class TaskQueue(object):
       green=self.green,
     )
 
-  def purge(self):
+  def purge(self, native=False):
     """Deletes all tasks in the queue."""
     try:
-      return self.api.purge()
+      return self.api.purge(native)
     except AttributeError:
       while True:
         lst = self.list()

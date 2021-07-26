@@ -1,4 +1,5 @@
 import os
+import math
 
 import click
 from tqdm import tqdm
@@ -44,13 +45,18 @@ def status(queuepath):
   enq = tq.enqueued
   comp = tq.completed
   leased = tq.leased
-  print(f"Inserted: {ins}")
+
+  if not math.isnan(ins):
+    print(f"Inserted: {ins}")
+
   if ins > 0:
     print(f"Enqueued: {enq} ({enq / ins * 100:.1f}% left)")
-    print(f"Completed: {comp} ({comp / ins * 100:.1f}%)")
+    if not math.isnan(comp):
+      print(f"Completed: {comp} ({comp / ins * 100:.1f}%)")
   else:
     print(f"Enqueued: {enq} (--% left)")
-    print(f"Completed: {comp} (--%)")
+    if not math.isnan(comp):
+      print(f"Completed: {comp} (--%)")
 
   if enq > 0:
     print(f"Leased: {leased} ({leased / enq * 100:.1f}% of queue)")
@@ -118,8 +124,13 @@ def mv(src, dest):
       tqs.delete(tasks)
       pbar.update(len(tasks))
 
-
-
+@main.command()
+@click.argument("queuepath")
+def purge(queuepath):
+  """Delete all queued messages and zero out queue statistics."""
+  queuepath = normalize_path(queuepath)
+  tq = TaskQueue(queuepath)
+  tq.purge()
 
 
 

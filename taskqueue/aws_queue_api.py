@@ -57,15 +57,16 @@ class AWSTaskQueueAPI(object):
 
   @property
   def inserted(self):
-    raise NotImplementedError()
+    return float('NaN')
 
   @property
   def completed(self):
-    raise NotImplementedError()
+    return float('NaN')
 
   @property
   def leased(self):
-    raise NotImplementedError()
+    status = self.status()
+    return int(status['ApproximateNumberOfMessagesNotVisible'])
 
   def is_empty():
     return self.enqueued == 0
@@ -165,18 +166,18 @@ class AWSTaskQueueAPI(object):
   def tally(self):
     pass
 
-  def purge(self):
-    # This is more efficient, but it kept freezing
-    # try:
-    #     self.sqs.purge_queue(QueueUrl=self.qurl)
+  def purge(self, native=False):
+    # can throw:
     # except botocore.errorfactory.PurgeQueueInProgress:
+    if native:
+      self.sqs.purge_queue(QueueUrl=self.qurl)
+      return
 
     while self.enqueued:
       # visibility_timeout must be > 0 for delete to work
       tasks = self.lease(num_tasks=10, seconds=10)
       for task in tasks:
         self.delete(task)
-    return self
     
   def __iter__(self):
     return iter(self.lease(num_tasks=10, seconds=0))
