@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+2.11.0
+------
+
+* release(2.11.0): add ptq purge and support ptq status for SQS
+* feat: add purge command to cli, add status support to SQS
+* docs: update ptq on README
+
 2.10.0
 ------
 

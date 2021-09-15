@@ -63,11 +63,12 @@ class PrintTask(RegisteredTask):
 
 ## Local Usage
 
-For small jobs, you might want to use one or more processes to execute the tasks:
+For small jobs, you might want to use one or more processes to execute the tasks.
 
 ```python
 from functools import partial
 from taskqueue import LocalTaskQueue
+from mylibrary import PrintTask # mylibrary is wherever you defined PrintTask
 
 tq = LocalTaskQueue(parallel=5) # use 5 processes
 
@@ -94,10 +95,13 @@ This will load the queue with 1000 print tasks then execute them across five pro
 
 2. You can alternatively set up a file based queue that has the same time-based leasing property of an SQS queue.
 
+IMPORTANT: You must import the tasks that will be executed, otherwise the code to execute them has not been loaded.
+
 ```python
 # import gevent.monkey
 # gevent.monkey.patch_all(thread=False)
 from taskqueue import TaskQueue
+from mylibrary import PrintTask # mylibrary is wherever you defined PrintTask
 
 # region is SQS specific, green means cooperative threading
 tq = TaskQueue('sqs://queue-name', region_name="us-east1-b", green=False)
