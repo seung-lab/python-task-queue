@@ -7,6 +7,6 @@ orjson
 numpy>=1.13.1
 pathos
 pbr
-tenacity
+tenacity>=8.0.1
 tqdm
 requests>2,<3
