@@ -89,7 +89,7 @@ class AWSTaskQueueAPI(object):
     status = self.status()
     return int(status['ApproximateNumberOfMessagesNotVisible'])
 
-  def is_empty():
+  def is_empty(self):
     return self.enqueued == 0
 
   @retry
