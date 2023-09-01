@@ -1,6 +1,21 @@
 CHANGES
 =======
 
+2.12.1
+------
+
+* release(2.12.1): fixes is\_empty for sqs
+* fix: incorrect method declaration for sqs is\_empty
+* fix(sqs): add ApproximateNumberOfMessagesDelayed to status and enqueued
+* docs: document the JSON int->string issue
+
+2.12.0
+------
+
+* release(2.12.0): adds retry to SQS except for http 4xx errors
+* feat: add retry to SQS (#39)
+* docs: mention that tasks need to be imported
+
 2.11.0
 ------
 
