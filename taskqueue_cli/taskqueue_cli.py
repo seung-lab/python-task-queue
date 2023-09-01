@@ -1,5 +1,6 @@
 import os
 import math
+import importlib
 
 import click
 from tqdm import tqdm
@@ -72,7 +73,8 @@ def release(queuepath):
 @main.command()
 @click.argument("src")
 @click.argument("dest")
-def cp(src, dest):
+@click.option('--load', default=None, help="Load a module to get task definitions.", show_default=True)
+def cp(src, dest, load):
   """
   Copy the contents of a queue to another
   service or location. Do not run this
@@ -82,6 +84,9 @@ def cp(src, dest):
   but you can copy an fq to sqs. The mv
   command supports sqs queues.
   """
+  if load:
+    importlib.import_module(load)
+
   src = normalize_path(src)
   dest = normalize_path(dest)
 
