@@ -143,11 +143,16 @@ class AWSTaskQueueAPI(object):
   def rezero(self):
     pass
 
-  def renew_lease(self, seconds):
-    raise NotImplementedError() 
+  @retry
+  def renew_lease(self, task, seconds):
+    self.sqs.change_message_visibility(
+      QueueUrl=self.qurl,
+      ReceiptHandle=task.id,
+      VisibilityTimeout=seconds,
+    )
 
-  def cancel_lease(self, rhandle):
-    raise NotImplementedError()
+  def cancel_lease(self, task):
+    self.renew_lease(task, 0)
 
   def release_all(self):
     raise NotImplementedError()
