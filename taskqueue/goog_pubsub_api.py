@@ -6,7 +6,7 @@ from google.cloud import pubsub_v1
 from google.api_core.exceptions import ClientError
 from google.pubsub_v1.types import PullRequest
 from google.pubsub_v1.types import AcknowledgeRequest
-
+from .secrets import google_credentials
 
 from .lib import toiter, sip, jsonify
 
@@ -55,8 +55,10 @@ class PubSubTaskQueueAPI(object):
         else:
             self.subscription_id = ValueError("subscription_id not found in qurl")
 
-        self.subscriber = pubsub_v1.SubscriberClient()
-        self.publisher = pubsub_v1.PublisherClient()
+        credentials = google_credentials()
+
+        self.subscriber = pubsub_v1.SubscriberClient(credentials=credentials)
+        self.publisher = pubsub_v1.PublisherClient(credentials=credentials)
         self._topic_path = self.publisher.topic_path(self.project_id, self.topic_id)
         self._subscription_path = self.subscriber.subscription_path(
             self.project_id, self.subscription_id
