@@ -1,6 +1,14 @@
 CHANGES
 =======
 
+2.13.0
+------
+
+* release(2.13.0): adds --load to cp, adds renew\_lease to sqs
+* chore: update ChangeLog
+* feat: add ability to load definitions in cp
+* feat: implement renew\_lease for sqs
+
 2.12.1
 ------
 

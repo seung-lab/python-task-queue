@@ -3,7 +3,7 @@ import json
 import os
 import time
 
-from moto import mock_sqs
+from moto import mock_aws
 
 from six.moves import range
 import pytest
@@ -29,7 +29,7 @@ def aws_credentials():
 
 @pytest.fixture(scope='function')
 def sqs(aws_credentials):
-  with mock_sqs():
+  with mock_aws():
     import boto3
     client = boto3.client('sqs')
     client.create_queue(QueueName='test-pull-queue')
