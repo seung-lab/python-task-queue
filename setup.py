@@ -9,5 +9,8 @@ setuptools.setup(
     ],
   },
   long_description_content_type="text/markdown",
-  pbr=True
+  pbr=True,
+  extras_require={
+    "pubsub": ["google-cloud-pubsub"],
+  }
 )
