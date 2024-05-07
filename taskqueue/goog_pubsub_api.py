@@ -32,10 +32,16 @@ class PubSubTaskQueueAPI(object):
     def __init__(self, qurl, **kwargs):
         """
         qurl: a topic or subscription location
-          like projects/{project_id}/topics/{topic_id}/subscriptions/{subscription_id}
+          conforms to this format projects/{project_id}/topics/{topic_id}/subscriptions/{subscription_id}
         kwargs: Keywords for the underlying boto3.client constructor, other than `service_name`,
           `region_name`, `aws_secret_access_key`, or `aws_access_key_id`.
         """
+        pattern = r"^projects/(?P<project_id>[\w\d-]+)/topics/(?P<topic_id>[\w\d-]+)/subscriptions/(?P<subscription_id>[\w\d-]+)$"
+        matches = re.match(pattern, qurl)
+        if matches is None:
+            raise ValueError(
+                "qurl does not conform to the required format (projects/{project_id}/topics/{topic_id}/subscriptions/{subscription_id})"
+            )
 
         matches = re.search(r"projects/([\w\d-]+)/", qurl)
         if matches is not None:
