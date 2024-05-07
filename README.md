@@ -198,7 +198,7 @@ gcloud pubsub subscriptions create TASKQUEUE_TEST_SUBSCRIPTION --topic TASKQUEUE
 Then you can specify a taskqueue using this url format
 
 ```python
-queue_url = "pubsub://projects/seung-lab/topics/TASKQUEUE_TEST_TOPIC/subscriptions/TASKQUEUE_TEST_SUBSCRIPTION"
+queue_url = "pubsub://projects/<GOOGLE_PROJECT_ID>/topics/TASKQUEUE_TEST_TOPIC/subscriptions/TASKQUEUE_TEST_SUBSCRIPTION"
 
 tq = TaskQueue(queue_url)
 ```
