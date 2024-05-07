@@ -4,6 +4,9 @@ import types
 
 from google.cloud import pubsub_v1
 from google.api_core.exceptions import ClientError
+from google.pubsub_v1.types import PullRequest
+from google.pubsub_v1.types import AcknowledgeRequest
+
 
 from .lib import toiter, sip, jsonify
 
@@ -54,9 +57,7 @@ class PubSubTaskQueueAPI(object):
 
         self.subscriber = pubsub_v1.SubscriberClient()
         self.publisher = pubsub_v1.PublisherClient()
-        self._topic_path = self.publisher.topic_path(
-            self.project_id, self.subscription_id
-        )
+        self._topic_path = self.publisher.topic_path(self.project_id, self.topic_id)
         self._subscription_path = self.subscriber.subscription_path(
             self.project_id, self.subscription_id
         )
@@ -138,7 +139,10 @@ class PubSubTaskQueueAPI(object):
 
     def lease(self, seconds, num_tasks=1, wait_sec=20):
         # Pull messages from the subscription
-        response = self.subscriber.pull(self.subscription_path, max_messages=num_tasks)
+        request = PullRequest(
+            subscription=self._subscription_path, max_messages=num_tasks
+        )
+        response = self.subscriber.pull(request)
 
         tasks = []
         for received_message in response.received_messages:
@@ -158,9 +162,10 @@ class PubSubTaskQueueAPI(object):
                 ack_id = task._id
             except AttributeError:
                 ack_id = task["id"]
-
-        self.subscriber.acknowledge(self._subscription_path, [ack_id])
-
+        request = AcknowledgeRequest(
+            subscription=self._subscription_path, ack_ids=[ack_id]
+        )
+        self.subscriber.acknowledge(request=request)
         return 1
 
     def tally(self):
@@ -179,7 +184,10 @@ class PubSubTaskQueueAPI(object):
 
             # Acknowledge all received messages
             ack_ids = [msg.ack_id for msg in response.received_messages]
-            self.subscriber.acknowledge(self._subscription_path, ack_ids)
+            request = AcknowledgeRequest(
+                subscription=self._subscription_path, ack_ids=ack_ids
+            )
+            self.subscriber.acknowledge(request=request)
 
     def __iter__(self):
         return iter(self.lease(num_tasks=10, seconds=0))
