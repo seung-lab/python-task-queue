@@ -44,22 +44,13 @@ class PubSubTaskQueueAPI(object):
             )
 
         matches = re.search(r"projects/([\w\d-]+)/", qurl)
-        if matches is not None:
-            self.project_id = matches.group(1)
-        else:
-            raise ValueError("Project ID not found in qurl")
+        self.project_id = matches.group(1)
 
         matches = re.search(r"topics/([\w\d-]+)", qurl)
-        if matches is not None:
-            self.topic_id = matches.group(1)
-        else:
-            self.topic_id = ValueError("topic_id not found in qurl")
+        self.topic_id = matches.group(1)
 
         matches = re.search(r"subscriptions/([\w\d-]+)", qurl)
-        if matches is not None:
-            self.subscription_id = matches.group(1)
-        else:
-            self.subscription_id = ValueError("subscription_id not found in qurl")
+        self.subscription_id = matches.group(1)
 
         project_name, credentials = google_credentials()
 
