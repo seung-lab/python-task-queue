@@ -10,7 +10,7 @@ ExtractedPath = namedtuple('ExtractedPath',
   ('protocol', 'path')
 )
 
-ALLOWED_PROTOCOLS = [ 'sqs', 'fq', 'mem' ]
+ALLOWED_PROTOCOLS = [ 'sqs', 'fq', 'mem', 'pubsub']
 
 def mkpath(extracted_path):
   return extracted_path.protocol + "://" + extracted_path.path

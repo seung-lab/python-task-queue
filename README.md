@@ -185,6 +185,31 @@ services:
       - SQS_QUEUE=my-aws-queue
       - SQS_REGION=us-west-1
 ```
+### Notes on Google PubSub
+TaskQueue will try to connect to pubsub using the credentials it finds at ~/.cloudvolume/secrets/google-secret.json 
+
+You must first make both a topic and a subscription that is subscribed to that topic.
+
+```
+gcloud pubsub topics create TASKQUEUE_TEST_TOPIC
+gcloud pubsub subscriptions create TASKQUEUE_TEST_SUBSCRIPTION --topic TASKQUEUE_TEST_TOPIC
+```
+
+Then you can specify a taskqueue using this url format (which we invented to include both the project_id, topic and subscription) 
+
+```python
+queue_url = "pubsub://projects/<GOOGLE_PROJECT_ID>/topics/TASKQUEUE_TEST_TOPIC/subscriptions/TASKQUEUE_TEST_SUBSCRIPTION"
+
+tq = TaskQueue(queue_url)
+```
+Note that Google PubSub doesn't have all the same features as Amazon SQS, including statistics reporting, and so some features do not function properly with this backend.
+
+Also, google pubsub libraries are not installed by default and so if you want to use this backend install with the pubsub option
+
+```
+pip install task-queue[pubsub]
+```
+
 
 ### Notes on File Queue
 

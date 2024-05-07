@@ -90,6 +90,9 @@ class TaskQueue(object):
       return AWSTaskQueueAPI(path.path, **kwargs)
     elif path.protocol == 'fq':
       return FileQueueAPI(path.path)
+    elif path.protocol == 'pubsub':
+      from .goog_pubsub_api import PubSubTaskQueueAPI
+      return PubSubTaskQueueAPI(path.path, **kwargs)
     else:
       raise UnsupportedProtocolError('Unsupported protocol ' + str(self.path.protocol))
 
