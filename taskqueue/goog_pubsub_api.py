@@ -55,7 +55,7 @@ class PubSubTaskQueueAPI(object):
         else:
             self.subscription_id = ValueError("subscription_id not found in qurl")
 
-        credentials = google_credentials()
+        project_name, credentials = google_credentials()
 
         self.subscriber = pubsub_v1.SubscriberClient(credentials=credentials)
         self.publisher = pubsub_v1.PublisherClient(credentials=credentials)
