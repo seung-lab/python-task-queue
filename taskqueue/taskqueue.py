@@ -470,6 +470,10 @@ class LocalTaskQueue(object):
 
     total = totalfn(self.queue, total)
 
+    # Don't fork, spawn entirely new processes. This
+    # avoids accidental deadlocks.
+    mp.set_start_method("spawn", force=True)
+
     with tqdm(total=total, desc="Tasks", disable=(not progress)) as pbar:
       if self.parallel == 1:
         while self.queue:
