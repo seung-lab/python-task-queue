@@ -563,6 +563,10 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
   if platform.system().lower() == "darwin":
     os.environ["no_proxy"] = "*"
 
+  # Don't fork, spawn entirely new processes. This
+  # avoids accidental deadlocks.
+  mp.set_start_method("spawn", force=True)
+
   ct = 0
   with tqdm(desc="Upload", total=total) as pbar:
     with pathos.pools.ProcessPool(parallel) as pool:
