@@ -1,4 +1,9 @@
-import fcntl
+try:
+  import fcntl
+  FILEQUEUE_SUPPORTED = True
+except ImportError:
+  FILEQUEUE_SUPPORTED = False
+
 import functools
 import itertools
 import json
@@ -164,6 +169,12 @@ class FileQueueAPI(object):
   time is very long.
   """
   def __init__(self, path):
+    if not FILEQUEUE_SUPPORTED:
+      raise NotImplementedError(
+        "FileQueueAPI is only supported on unix based systems due to a "
+        "dependency on fcntl interprocess locking."
+      )
+
     path = toabs(path)
     self.path = path
 
