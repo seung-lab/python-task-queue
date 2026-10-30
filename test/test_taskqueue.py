@@ -4,7 +4,6 @@ import os
 import time
 
 from moto import mock_aws
-
 from six.moves import range
 import pytest
 
@@ -18,7 +17,7 @@ from taskqueue.paths import ExtractedPath, mkpath
 from taskqueue.queueables import totask
 from taskqueue.queueablefns import tofunc, UnregisteredFunctionError, func2task
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='session')
 def aws_credentials():
   """Mocked AWS Credentials for moto."""
   os.environ['AWS_ACCESS_KEY_ID'] = 'testing'
@@ -34,6 +33,17 @@ def sqs(aws_credentials):
     client = boto3.client('sqs')
     client.create_queue(QueueName='test-pull-queue')
     yield client
+
+@pytest.fixture(scope='session')
+def sqs_server(aws_credentials):
+  from moto.server import ThreadedMotoServer
+  server = ThreadedMotoServer(port=0)
+  server.start()
+  host, port = server.get_host_and_port()
+  os.environ['AWS_ENDPOINT_URL'] = f"http://{host}:{port}"
+  yield
+  del os.environ['AWS_ENDPOINT_URL']
+  server.stop()
 
 QURLS = {
   'sqs': 'test-pull-queue',
@@ -269,7 +279,7 @@ def test_local_taskqueue():
   assert tq.insert(epts) == 200
 
 @pytest.mark.parametrize('protocol', PROTOCOL)
-def test_parallel_insert_all(sqs, protocol):
+def test_parallel_insert_all(sqs, sqs_server, protocol):
   import pathos_issue
 
   path = getpath(protocol) 

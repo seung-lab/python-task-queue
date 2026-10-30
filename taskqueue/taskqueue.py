@@ -14,7 +14,7 @@ import types
 import sys
 
 import gevent.pool
-import multiprocessing as mp
+import multiprocess as mp  # used by pathos.pools.ProcessPool
 import numpy as np
 import pathos.pools
 from tqdm import tqdm
@@ -472,7 +472,7 @@ class LocalTaskQueue(object):
 
     # Don't fork, spawn entirely new processes. This
     # avoids accidental deadlocks.
-    mp.set_start_method("spawn", force=True)
+    spawn_ctx = mp.get_context("spawn")
 
     with tqdm(total=total, desc="Tasks", disable=(not progress)) as pbar:
       if self.parallel == 1:
@@ -480,7 +480,7 @@ class LocalTaskQueue(object):
           _task_execute(self.queue.pop(0))
           pbar.update()
       else:
-        with pathos.pools.ProcessPool(self.parallel) as executor:
+        with pathos.pools.ProcessPool(self.parallel, context=spawn_ctx) as executor:
           for _ in executor.imap(_task_execute, self.queue):
             pbar.update()
     
@@ -513,8 +513,6 @@ def soloprocess_upload(QueueClass, queue_name, tasks):
   tq = QueueClass(queue_name, progress=False)
   return tq.insert(tasks, skip_insert_counter=True)
 
-error_queue = mp.Queue()
-
 def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None):
   if parallel is True:
     parallel = mp.cpu_count()
@@ -526,11 +524,10 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
     
   def capturing_soloprocess_upload(*args, **kwargs):
     try:
-      return soloprocess_upload(*args, **kwargs)
+      return (soloprocess_upload(*args, **kwargs), None)
     except Exception as err:
       print(err)
-      error_queue.put(err)
-    return 0
+      return (0, err)
 
   uploadfn = partial(
     capturing_soloprocess_upload, QueueClass, queue_name
@@ -569,12 +566,17 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
 
   # Don't fork, spawn entirely new processes. This
   # avoids accidental deadlocks.
-  mp.set_start_method("spawn", force=True)
+  spawn_ctx = mp.get_context("spawn")
 
   ct = 0
+  errors = []
   with tqdm(desc="Upload", total=total) as pbar:
-    with pathos.pools.ProcessPool(parallel) as pool:
-      for num_inserted in pool.imap(uploadfn, sip(tasks, block_size)):
+    with pathos.pools.ProcessPool(parallel, context=spawn_ctx) as pool:
+      for num_inserted, err in pool.imap(uploadfn, sip(tasks, block_size)):
+        if err is not None:
+          if not isinstance(err, StopIteration):
+            errors.append(err)
+          continue
         pbar.update(num_inserted)
         ct += num_inserted
 
@@ -584,14 +586,8 @@ def multiprocess_upload(QueueClass, queue_name, tasks, parallel=True, total=None
     os.environ["no_proxy"] = no_proxy
   # task.__class__.__module__ = cls_module
 
-  if not error_queue.empty():
-    errors = []
-    while not error_queue.empty():
-      err = error_queue.get()
-      if err is not StopIteration:
-        errors.append(err)
-    if len(errors):
-      raise Exception(errors)
+  if errors:
+    raise Exception(errors)
 
   return ct
 
